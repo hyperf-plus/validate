@@ -11,10 +11,10 @@ use Hyperf\Di\Annotation\AbstractAnnotation;
 class Validation extends AbstractAnnotation
 {
     /**
-     * 模块
+     * 自定义规则
      * @var string
      */
-    public  $mode = '';
+    public  $rules = [];
     /**
      * 验证器
      * @var string
@@ -35,12 +35,6 @@ class Validation extends AbstractAnnotation
      * @var bool
      */
     public  $filter = false;
-    /**
-     * 过滤是否抛出异常
-     * @var bool
-     */
-    public  $throw = false;
-
     /**
      * 安全模式严格按照规则字段，如果多字段会抛出异常
      * @var bool

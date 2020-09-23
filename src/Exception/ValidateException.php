@@ -1,6 +1,6 @@
 <?php
 
-namespace HPlus\Validate;
+namespace HPlus\Validate\Exception;
 
 class ValidateException extends \Exception
 {
