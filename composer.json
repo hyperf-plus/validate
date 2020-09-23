@@ -1,0 +1,38 @@
+{
+  "name": "hyperf-plus/validate",
+  "type": "library",
+  "keywords": [
+    "php",
+    "hyperf-plus",
+    "validate",
+    "hyperf"
+  ],
+  "description": "hyperf-plus validate 支持request 和方法场景验证，兼容tp5写法 支持控制器注解验证、方法注解验证",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=7.2",
+    "hyperf/di": "~2.0.1",
+    "hyperf/http-message": "~2.0.0",
+    "hyperf/utils": "~2.0.0"
+  },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^2.14"
+  },
+  "suggest": {
+    "ext-json": "Required to use JSON."
+  },
+  "autoload": {
+    "psr-4": {
+      "HPlus\\Validate\\": "src/"
+    }
+  },
+  "extra": {
+    "hyperf": {
+      "config": "HPlus\\Validate\\ConfigProvider"
+    }
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "prefer-stable": true
+}
