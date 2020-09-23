@@ -1,10 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace HPlus\Validate;
+namespace HPlus\Validate\Aspect;
 
 use HPlus\Validate\Annotations\RequestValidation;
 use HPlus\Validate\Annotations\Validation;
+use HPlus\Validate\Validate;
+use HPlus\Validate\Exception\ValidateException;
 use Hyperf\Di\Annotation\Aspect;
 use Hyperf\Di\Aop\AbstractAspect;
 use Hyperf\Di\Aop\ProceedingJoinPoint;
@@ -77,20 +79,23 @@ class ValidationAspect extends AbstractAspect
         /**
          * @var Validate $validate
          */
-        if (class_exists($class)) {
-            $validate = new $class;
+        if ($validation->rules != null) {
+            $validate = new Validate();
+            $rules = $validation->rules;
         } else {
-            throw new ValidateException('class not exists:' . $class);
+            if (class_exists($class)) {
+                $validate = new $class;
+            } else {
+                throw new ValidateException('class not exists:' . $class);
+            }
+            if ($validation->scene == '') {
+                $validation->scene = $proceedingJoinPoint->methodName;
+            }
+            $rules = $validate->getSceneRule($validation->scene);
         }
-        if ($validation->scene == '') {
-            $validation->scene = $proceedingJoinPoint->methodName;
-        }
-        $rules = $validate->getSceneRule($validation->scene);
-
-        if ($validate->batch($validation->batch)->check($verData, $rules,$validation->scene) === false) {
+        if ($validate->batch($validation->batch)->check($verData, $rules, $validation->scene) === false) {
             throw new ValidateException($validate->getError());
         }
-
         if ($validation->security) {
             $fields = [];
             foreach ($rules as $field => $rule) {
