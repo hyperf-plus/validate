@@ -45,6 +45,11 @@ class RequestValidation extends AbstractAnnotation
      * @var bool
      */
     public $batch = false;
+    /**
+     * 验证数据类型，支持json|xml|form表单
+     * @var string
+     */
+    public $dateType = 'json';
 
     public function __construct($value = null)
     {
