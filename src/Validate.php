@@ -392,6 +392,20 @@ class Validate
         }
 
         foreach ($rules as $key => $rule) {
+
+            // field => 'rule1|rule2...' field => ['rule1','rule2',...]
+            if (is_numeric($key)) {
+                $key = $rule;
+                $rule = $this->rule[$key] ?? '';
+            }
+            if (is_array($rule)) {
+                $rule = array_filter($rule);
+            }
+
+            if (empty($rule)) {
+                continue;
+            }
+
             // field => 'rule1|rule2...' field => ['rule1','rule2',...]
             if (strpos($key, '|')) {
                 // 字段|描述 用于指定属性名称
@@ -407,18 +421,39 @@ class Validate
 
             // 获取数据 支持二维数组
             $value = $this->getDataValue($data, $key);
-
-            // 字段验证
-            if ($rule instanceof \Closure) {
-                // 匿名函数验证 支持传入当前字段和所有字段两个数据
-                $result = call_user_func_array($rule, [$value, $data]);
-            } elseif ($rule instanceof ValidateRule) {
-                //  验证因子
-                $result = $this->checkItem($key, $value, $rule->getRule(), $data, $rule->getTitle() ?: $title, $rule->getMsg());
-            } else {
-                $result = $this->checkItem($key, $value, $rule, $data, $title);
+            switch (true) {
+                case $rule instanceof \Closure:
+                    $result = call_user_func_array($rule, [$value, $data]);
+                    break;
+                case $rule instanceof ValidateRule:
+                    $result = $this->checkItem($key, $value, $rule->getRule(), $data, $rule->getTitle() ?: $title, $rule->getMsg());
+                    break;
+                case is_array($rule) && is_integer(key($rule)):      #判断是否是二维数组验证
+                    $result = $this->checkItem($key, $value, $rule, $data, $title);
+                    break;
+                case is_array($rule):
+                    if (!isset($data[$key]) || !is_array($data[$key])) {
+                        $result = '参数' . $key . "必须为二维数组";
+                        break;
+                    }
+                    $ruleStr = [];
+                    foreach ($rule as $ruleKey => $itemRule) {
+                        $field = str_replace('*.', '', $ruleKey);
+                        $ruleStr[$field] = $itemRule;
+                    }
+                    foreach ($data[$key] as $item) {
+                        if (!is_array($item)) {
+                            $result = $key . "必须为二维数组";
+                            break;
+                        }
+                        $result = $this->check($item, $ruleStr, $key);
+                        if ($result !== true) return false;
+                    }
+                    break;
+                default:
+                    $result = $this->checkItem($key, $value, $rule, $data, $title);
+                    break;
             }
-
             if (true !== $result) {
                 // 没有返回true 则表示验证失败
                 if (!empty($this->batch)) {
