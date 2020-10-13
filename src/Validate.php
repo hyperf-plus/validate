@@ -4,6 +4,8 @@ namespace HPlus\Validate;
 
 use SplFileInfo;
 use SplFileObject;
+use Hyperf\DbConnection\Db;
+use Hyperf\Utils\Str;
 
 class Validate
 {
@@ -80,6 +82,7 @@ class Validate
         'allowIp' => '不允许的IP访问',
         'denyIp' => '禁止的IP访问',
         'confirm' => ':attribute和确认字段:2不一致',
+        'confirmed' => ':attribute和确认字段:2不一致',
         'different' => ':attribute和比较字段:2不能相同',
         'egt' => ':attribute必须大于等于 :rule',
         'gt' => ':attribute必须大于 :rule',
@@ -91,6 +94,7 @@ class Validate
         'fileSize' => '上传文件大小不符',
         'fileExt' => '上传文件后缀不符',
         'fileMime' => '上传文件类型不符',
+        'unique' => ':attribute 已存在',
     ];
 
     /**
@@ -655,13 +659,21 @@ class Validate
     public function confirmed($value, $rule, array $data = [], string $field = ''): bool
     {
         if ('' == $rule) {
-            if (strpos($field, '_confirm')) {
+            if (strpos($field, '_confirm') !== false) {
                 $rule = strstr($field, '_confirm', true);
             } else {
                 $rule = $field . '_confirm';
             }
         }
-        return $this->getDataValue($data, $rule) === $value;
+        //_confirmation
+        if ($this->getDataValue($data, $rule) === $value) {
+            return true;
+        }
+        //
+        if ($this->getDataValue($data, $field . "_confirmation") === $value) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -766,11 +778,15 @@ class Validate
         $rule = preg_replace_callback('/_([a-zA-Z])/', function ($match) {
             return strtoupper($match[1]);
         }, $rule);
-
         switch (lcfirst($rule)) {
             case 'require':
+            case 'required':
                 // 必须
                 $result = !empty($value) || '0' == $value;
+                break;
+            case 'string':
+                // 接受
+                $result = is_string($value);
                 break;
             case 'accepted':
                 // 接受
@@ -1303,6 +1319,57 @@ class Validate
     {
         return !in_array($value, is_array($rule) ? $rule : explode(',', $rule));
     }
+
+    /**
+     * 验证是否唯一
+     * @access public
+     * @param mixed $value 字段值
+     * @param mixed $rule 验证规则 格式：数据表,字段名,排除ID,主键名
+     * @param array $data 数据
+     * @param string $field 验证字段名
+     * @return bool
+     */
+    public function unique($value, $rule, array $data = [], string $field = ''): bool
+    {
+        if (is_string($rule)) {
+            $rule = explode(',', $rule);
+        }
+        if (false !== strpos($rule[0], '\\')) {
+            // 指定模型类
+            $db = new $rule[0];
+        } else {
+            $db = Db::table($rule[0]);
+        }
+        $key = $rule[1] ?? $field;
+        $map = [];
+
+        if (strpos($key, '^')) {
+            // 支持多个字段验证
+            $fields = explode('^', $key);
+            foreach ($fields as $key) {
+                if (isset($data[$key])) {
+                    $map[] = [$key, '=', $data[$key]];
+                }
+            }
+        } elseif (isset($data[$field])) {
+            $map[] = [$key, '=', $data[$field]];
+        } else {
+            $map = [];
+        }
+
+        $pk = !empty($rule[3]) ? $rule[3] : 'id';
+
+        if (isset($data[$pk])) {
+            $map[] = [$pk, '<>', $data[$pk]];
+        } elseif (isset($rule[2]) && $rule[2] != '') {
+            $map[] = [$pk, '<>', $rule[2]];
+        }
+        if ($db->where($map)->count()) {
+            return false;
+        }
+        return true;
+    }
+
 
     /**
      * 使用正则验证数据
