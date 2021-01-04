@@ -112,11 +112,16 @@ class ValidationAspect extends AbstractAspect
         };
 
         if ($validation->filter) {
-            foreach ($rules as $key => $item) {
-                if (isset($verData[$key]) && $verData[$key] === null) {
-                    unset($verData[$key]);
+            $fields = [];
+            foreach ($rules as $field => $rule) {
+                if (is_numeric($field)) {
+                    $field = $rule;
                 }
+                $fields[] = $field;
             }
+            $verData = array_filter($verData, function ($value, $key) use ($fields) {
+                return in_array($key, $fields);
+            }, ARRAY_FILTER_USE_BOTH);
 
             switch ($isRequest) {
                 case true:
