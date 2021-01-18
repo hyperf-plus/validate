@@ -93,32 +93,20 @@ class ValidationAspect extends AbstractAspect
             }
             $rules = $validate->getSceneRule($validation->scene);
         }
+
         if ($validate->batch($validation->batch)->check($verData, $rules, $validation->scene) === false) {
             throw new ValidateException($validate->getError());
         }
         if ($validation->security) {
-            $fields = [];
-            foreach ($rules as $field => $rule) {
-                if (is_numeric($field)) {
-                    $field = $rule;
-                }
-                $fields[$field] = 1;
-            }
+            $fields = $this->getFields($rules);
             foreach ($verData as $key => $item) {
-                if (!isset($fields[$key])) {
+                if (!in_array($key, $fields)) {
                     throw new ValidateException('params ' . $key . ' invalid');
                 }
             }
         };
-
         if ($validation->filter) {
-            $fields = [];
-            foreach ($rules as $field => $rule) {
-                if (is_numeric($field)) {
-                    $field = $rule;
-                }
-                $fields[] = $field;
-            }
+            $fields = $this->getFields($rules);
             $verData = array_filter($verData, function ($value, $key) use ($fields) {
                 return in_array($key, $fields);
             }, ARRAY_FILTER_USE_BOTH);
@@ -134,5 +122,21 @@ class ValidationAspect extends AbstractAspect
                     break;
             }
         }
+    }
+
+    protected function getFields(array $rules)
+    {
+        $fields = [];
+        foreach ($rules as $field => $rule) {
+            if (is_numeric($field)) {
+                $field = $rule;
+            }
+            if (strpos($field, '|')) {
+                // 字段|描述 用于指定属性名称
+                list($field,) = explode('|', $field);
+            }
+            $fields[] = $field;
+        }
+        return $fields;
     }
 }

@@ -418,11 +418,6 @@ class Validate
                 $title = isset($this->field[$key]) ? $this->field[$key] : $key;
             }
 
-            // 场景检测
-            if (!empty($this->only) && !in_array($key, $this->only)) {
-                continue;
-            }
-
             // 获取数据 支持二维数组
             $value = $this->getDataValue($data, $key);
             switch (true) {

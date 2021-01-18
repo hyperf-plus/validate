@@ -33,6 +33,5 @@
   },
   "config": {
     "sort-packages": true
-  },
-  "prefer-stable": true
+  }
 }
