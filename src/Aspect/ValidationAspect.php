@@ -93,7 +93,6 @@ class ValidationAspect extends AbstractAspect
             }
             $rules = $validate->getSceneRule($validation->scene);
         }
-
         if ($validate->batch($validation->batch)->check($verData, $rules, $validation->scene) === false) {
             throw new ValidateException($validate->getError());
         }
