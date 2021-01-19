@@ -377,17 +377,15 @@ class Validate
      * @param string $scene 验证场景
      * @return bool
      */
-    public function check($data, $rules = [], $scene = '')
+    public function check($data, $rules = [], $scene = null)
     {
         $this->error = [];
-
         if (empty($rules)) {
             // 读取验证规则
-            $rules = $this->rule;
+            $rules = $this->getSceneRule($scene ?? $this->currentScene);
         }
 
         // 获取场景定义
-        $this->getScene($scene);
 
         foreach ($this->append as $key => $rule) {
             if (!isset($rules[$key])) {
@@ -396,20 +394,13 @@ class Validate
         }
 
         foreach ($rules as $key => $rule) {
-
             // field => 'rule1|rule2...' field => ['rule1','rule2',...]
-            if (is_numeric($key)) {
-                $key = $rule;
-                $rule = $this->rule[$key] ?? '';
-            }
             if (is_array($rule)) {
                 $rule = array_filter($rule);
             }
-
             if (empty($rule)) {
                 continue;
             }
-
             // field => 'rule1|rule2...' field => ['rule1','rule2',...]
             if (strpos($key, '|')) {
                 // 字段|描述 用于指定属性名称
@@ -418,7 +409,7 @@ class Validate
                 $title = isset($this->field[$key]) ? $this->field[$key] : $key;
             }
 
-            // 获取数据 支持二维数组
+            // 获取数据 支持多维数组
             $value = $this->getDataValue($data, $key);
             switch (true) {
                 case $rule instanceof \Closure:
@@ -431,23 +422,29 @@ class Validate
                     $result = $this->checkItem($key, $value, $rule, $data, $title);
                     break;
                 case is_array($rule):
-                    if (!isset($data[$key]) || !is_array($data[$key])) {
+                    if (!is_array($value)) {
                         $result = '参数' . $key . "必须为二维数组";
                         break;
                     }
                     $ruleStr = [];
                     foreach ($rule as $ruleKey => $itemRule) {
-                        $field = str_replace('*.', '', $ruleKey);
-                        $ruleStr[$field] = $itemRule;
+                        $ruleStr[$ruleKey] = $itemRule;
                     }
-                    foreach ($data[$key] as $item) {
+                    $iv = 0;
+                    $newVal = new Validate([], [], $this->field[$key] ?? []);
+                    foreach ($value as $item) {
+                        $iv++;
                         if (!is_array($item)) {
-                            $result = $key . "必须为二维数组";
+                            $result = $key . "第{$iv}项必须为二维数组";
                             break;
                         }
-                        $result = $this->check($item, $ruleStr, $key);
-                        if ($result !== true) return false;
+                        $result = $newVal->check($item, $ruleStr, $key);
+                        if ($result !== true) {
+                            $this->error = $key . "第{$iv}项的" . $newVal->getError();
+                            return false;
+                        }
                     }
+                    return true;
                     break;
                 default:
                     $result = $this->checkItem($key, $value, $rule, $data, $title);
@@ -468,7 +465,6 @@ class Validate
                 }
             }
         }
-
         return !empty($this->error) ? false : true;
     }
 
@@ -577,7 +573,6 @@ class Validate
             } else {
                 // 判断验证类型
                 list($type, $rule, $info) = $this->getValidateType($key, $rule);
-
                 if (isset($this->remove[$field]) && in_array($info, $this->remove[$field])) {
                     // 规则已经移除
                     $i++;
@@ -1405,13 +1400,15 @@ class Validate
         if (is_numeric($key)) {
             $value = $key;
         } elseif (strpos($key, '.')) {
-            // 支持二维数组验证
-            list($name1, $name2) = explode('.', $key);
-            $value = isset($data[$name1][$name2]) ? $data[$name1][$name2] : null;
+            // 支持多维数组验证
+            $tmp = $data;
+            foreach (explode('.', $key) as $segment) {
+                $tmp = $tmp[$segment] ?? null;
+            }
+            $value = $tmp;
         } else {
             $value = isset($data[$key]) ? $data[$key] : null;
         }
-
         return $value;
     }
 
@@ -1509,7 +1506,28 @@ class Validate
 
     public function getSceneRule(string $name)
     {
-        return $this->scene[$name] ?? $this->rule;
+        $rules = $this->scene[$name] ?? $this->rule;
+        $newRules = [];
+        foreach ($rules as $key => $rule) {
+            if (is_numeric($key)) {
+                $key = $rule;
+                $rule = $this->rule[$key] ?? '';
+            }
+            if (!empty($rule)) $newRules[$key] = $rule;
+            $this->getRule($key, $newRules);
+        }
+        return $newRules;
+    }
+
+
+    public function getRule($field, &$newRules)
+    {
+        foreach ($this->rule as $key => $rule) {
+            if (strpos($key, $field . ".") !== false) {
+                $newRules[$key] = $rule;
+            }
+        }
+        return $newRules;
     }
 
 }
