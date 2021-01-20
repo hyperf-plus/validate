@@ -1504,7 +1504,7 @@ class Validate
         return call_user_func_array([$this, 'is'], $args);
     }
 
-    public function getSceneRule(string $name)
+    public function getSceneRule( $name)
     {
         $rules = $this->scene[$name] ?? $this->rule;
         $newRules = [];
