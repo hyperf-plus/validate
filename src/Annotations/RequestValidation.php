@@ -2,58 +2,58 @@
 
 namespace HPlus\Validate\Annotations;
 
+use Attribute;
 use Hyperf\Di\Annotation\AbstractAnnotation;
 
-/**
- * @Annotation
- * @Target("METHOD")
- */
+#[Attribute(Attribute::TARGET_CLASS | Attribute::TARGET_METHOD)]
 class RequestValidation extends AbstractAnnotation
 {
     /**
-     * 规则类
-     * @var string
+     * @param array $rules
+     * @param string|null $validate
+     * @param string|null $scene
+     * @param bool $filter
+     * @param bool $security
+     * @param bool $batch
+     * @param string $dateType
      */
-    public $rules = [];
-    /**
-     * 验证器
-     * @var string
-     */
-    public $validate = '';
-    /**
-     * 场景
-     * @var string
-     */
-    public $scene = '';
-    /**
-     * 场景
-     * @var string
-     */
-    public $value = '';
-    /**
-     * 是否过滤多余字段
-     * @var bool
-     */
-    public $filter = false;
-    /**
-     * 安全模式严格按照规则字段，如果多字段会抛出异常
-     * @var bool
-     */
-    public $security = false;
-    /**
-     * 是否批量验证
-     * @var bool
-     */
-    public $batch = false;
-    /**
-     * 验证数据类型，支持json|xml|form表单
-     * @var string
-     */
-    public $dateType = 'json';
-
-    public function __construct($value = null)
+    public function __construct(
+        /**
+         * 规则类
+         * @var string
+         */
+        public array   $rules = [],
+        /**
+         * 验证器
+         * @var string
+         */
+        public ?string $validate = null,
+        /**
+         * 场景
+         * @var string
+         */
+        public ?string $scene = null,
+        /**
+         * 是否过滤多余字段
+         * @var bool
+         */
+        public bool    $filter = false,
+        /**
+         * 安全模式严格按照规则字段，如果多字段会抛出异常
+         * @var bool
+         */
+        public bool    $security = false,
+        /**
+         * 是否批量验证
+         * @var bool
+         */
+        public bool    $batch = false,
+        /**
+         * 验证数据类型，支持json|xml|form表单
+         * @var string
+         */
+        public string  $dateType = 'json'
+    )
     {
-        parent::__construct($value);
-        $this->bindMainProperty('scene', $value);
     }
 }

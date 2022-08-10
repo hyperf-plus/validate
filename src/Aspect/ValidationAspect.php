@@ -1,6 +1,6 @@
 <?php
-declare(strict_types=1);
 
+declare (strict_types=1);
 namespace HPlus\Validate\Aspect;
 
 use HPlus\Validate\Annotations\RequestValidation;
@@ -11,30 +11,26 @@ use Hyperf\Di\Annotation\Aspect;
 use Hyperf\Di\Aop\AbstractAspect;
 use Hyperf\Di\Aop\ProceedingJoinPoint;
 use Hyperf\Di\Exception\Exception;
-use Hyperf\Utils\Context;
+use Hyperf\Context\Context;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
-/**
- * @Aspect
- */
+#[Aspect]
 class ValidationAspect extends AbstractAspect
 {
+    
     protected $container;
+    
     protected $request;
-
     // 要切入的类，可以多个，亦可通过 :: 标识到具体的某个方法，通过 * 可以模糊匹配
-    public $annotations = [
-        Validation::class,
-        RequestValidation::class
-    ];
-
+    // 要切入的类，可以多个，亦可通过 :: 标识到具体的某个方法，通过 * 可以模糊匹配
+    public array $annotations = [Validation::class, RequestValidation::class];
+    
     public function __construct(ContainerInterface $container, ServerRequestInterface $Request)
     {
         $this->container = $container;
         $this->request = $this->container->get(ServerRequestInterface::class);
     }
-
     /**
      * @param ProceedingJoinPoint $proceedingJoinPoint
      * @return mixed
@@ -62,7 +58,6 @@ class ValidationAspect extends AbstractAspect
         }
         return $proceedingJoinPoint->process();
     }
-
     /**
      * @param $validation
      * @param $verData
@@ -84,7 +79,7 @@ class ValidationAspect extends AbstractAspect
             $rules = $validation->rules;
         } else {
             if (class_exists($class)) {
-                $validate = new $class;
+                $validate = new $class();
             } else {
                 throw new ValidateException('class not exists:' . $class);
             }
@@ -103,16 +98,15 @@ class ValidationAspect extends AbstractAspect
                     throw new ValidateException('params ' . $key . ' invalid');
                 }
             }
-        };
+        }
         if ($validation->filter) {
             $fields = $this->getFields($rules);
-            $verData = array_filter($verData, function ($value, $key) use ($fields) {
+            $verData = array_filter($verData, function ($value, $key) use($fields) {
                 return in_array($key, $fields);
             }, ARRAY_FILTER_USE_BOTH);
-
             switch ($isRequest) {
                 case true:
-                    Context::override(ServerRequestInterface::class, function (ServerRequestInterface $request) use ($verData) {
+                    Context::override(ServerRequestInterface::class, function (ServerRequestInterface $request) use($verData) {
                         return $request->withParsedBody($verData);
                     });
                     break;
@@ -122,7 +116,7 @@ class ValidationAspect extends AbstractAspect
             }
         }
     }
-
+    
     protected function getFields(array $rules)
     {
         $fields = [];
@@ -132,7 +126,7 @@ class ValidationAspect extends AbstractAspect
             }
             if (strpos($field, '|')) {
                 // 字段|描述 用于指定属性名称
-                list($field,) = explode('|', $field);
+                list($field, ) = explode('|', $field);
             }
             $fields[] = $field;
         }

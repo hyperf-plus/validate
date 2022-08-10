@@ -10,13 +10,10 @@
   "description": "hyperf-plus validate 支持request 和方法场景验证，兼容tp5写法 支持控制器注解验证、方法注解验证",
   "license": "Apache-2.0",
   "require": {
-    "php": ">=7.2",
-    "hyperf/di": "^2.0",
-    "hyperf/http-message": "^2.0",
-    "hyperf/utils": "^2.0"
-  },
-  "require-dev": {
-    "friendsofphp/php-cs-fixer": "^2.14"
+    "php": ">=8.0",
+    "hyperf/di": "^3.0.0",
+    "hyperf/http-message": "^3.0.0",
+    "hyperf/utils": "^3.0.0"
   },
   "suggest": {
     "ext-json": "Required to use JSON."
