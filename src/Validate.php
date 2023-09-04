@@ -1056,6 +1056,11 @@ class Validate
             $param = null;
         }
 
+       // 检查 $param 是否为空，如果为空，则设置为一个空数组
+        if ($param === null) {
+            $param = [];
+        }
+
         return false !== filter_var($value, is_int($rule) ? $rule : filter_id($rule), $param);
     }
 
