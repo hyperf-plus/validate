@@ -23,7 +23,6 @@ class ValidationAspect extends AbstractAspect
     
     protected $request;
     // 要切入的类，可以多个，亦可通过 :: 标识到具体的某个方法，通过 * 可以模糊匹配
-    // 要切入的类，可以多个，亦可通过 :: 标识到具体的某个方法，通过 * 可以模糊匹配
     public array $annotations = [Validation::class, RequestValidation::class];
     
     public function __construct(ContainerInterface $container, ServerRequestInterface $Request)
@@ -69,7 +68,7 @@ class ValidationAspect extends AbstractAspect
     private function validationData($validation, $verData, $class, $proceedingJoinPoint, $isRequest = false)
     {
         /**
-         * @var RequestValidation $validation
+         * @var Validation $validation
          */
         /**
          * @var Validate $validate
@@ -89,7 +88,7 @@ class ValidationAspect extends AbstractAspect
             $rules = $validate->getSceneRule($validation->scene);
         }
         if ($validate->batch($validation->batch)->check($verData, $rules, $validation->scene) === false) {
-            throw new ValidateException($validate->getError());
+            throw new ValidateException((string)$validate->getError());
         }
         if ($validation->security) {
             $fields = $this->getFields($rules);
