@@ -5,7 +5,6 @@ namespace HPlus\Validate;
 use SplFileInfo;
 use SplFileObject;
 use Hyperf\DbConnection\Db;
-use Hyperf\Utils\Str;
 
 class Validate
 {
