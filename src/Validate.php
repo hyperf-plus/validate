@@ -1397,26 +1397,35 @@ class Validate
         return $this->error;
     }
 
+
     /**
      * 获取数据值
      * @access protected
      * @param array $data 数据
-     * @param string $key 数据标识 支持二维
+     * @param string $key 数据标识 支持多维嵌套
      * @return mixed
      */
     protected function getDataValue($data, $key)
     {
+        // 如果键是数字，直接返回键值
         if (is_numeric($key)) {
-            $value = $key;
-        } elseif (strpos($key, '.')) {
-            // 支持二维数组验证
-            list($name1, $name2) = explode('.', $key);
-            $value = isset($data[$name1][$name2]) ? $data[$name1][$name2] : null;
-        } else {
-            $value = isset($data[$key]) ? $data[$key] : null;
+            return $key;
         }
 
-        return $value;
+        // 支持多级嵌套字段
+        if (strpos($key, '.') !== false) {
+            $keys = explode('.', $key);
+            foreach ($keys as $k) {
+                if (!is_array($data) || !array_key_exists($k, $data)) {
+                    return null;
+                }
+                $data = $data[$k];
+            }
+            return $data;
+        }
+
+        // 单级键，直接访问
+        return isset($data[$key]) ? $data[$key] : null;
     }
 
     /**
