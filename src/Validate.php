@@ -629,9 +629,67 @@ class Validate
      */
     protected function checkItem(string $field, $value, $rules, array $data, string $title, array $msg = [])
     {
-
         if (is_string($rules)) {
             $rules = explode('|', $rules);
+        }
+
+        // 首先检查条件必填规则（requireIf, requireWith等）
+        foreach ($rules as $key => $rule) {
+            $info = is_numeric($key) ? $rule : $key;
+            if (is_string($info)) {
+                if (strpos($info, ':')) {
+                    [$method, $param] = explode(':', $info, 2);
+                } else {
+                    $method = $info;
+                    $param = null;
+                }
+            } else {
+                $method = $key;
+                $param = $info;
+            }
+
+            // 如果是条件必填规则，先执行它来决定是否需要验证
+            if (in_array($method, ['requireIf', 'requireWith', 'requireCallback'])) {
+                $requireResult = $this->$method($value, $param, $data, $field, $title);
+                
+                // 如果条件必填验证失败，直接返回错误
+                if (true !== $requireResult) {
+                    $errorMsg = $this->getRuleMsg($field, $title, $method, $param);
+                    $this->error = $errorMsg;
+                    return $errorMsg;
+                }
+                
+                // 如果条件不满足（requireIf返回true但字段为空），跳过所有其他验证
+                if (($value === '' || $value === null) && $requireResult === true) {
+                    // 检查条件是否真的满足
+                    if ($method === 'requireIf') {
+                        list($checkField, $checkVal) = explode(',', $param);
+                        if ($this->getDataValue($data, $checkField) != $checkVal) {
+                            return true; // 条件不满足，跳过验证
+                        }
+                    } elseif ($method === 'requireWith') {
+                        $checkVal = $this->getDataValue($data, $param);
+                        if (empty($checkVal)) {
+                            return true; // 条件不满足，跳过验证
+                        }
+                    }
+                }
+            }
+        }
+
+        // 检查是否有普通require规则
+        $hasRequireRule = false;
+        foreach ($rules as $rule) {
+            $ruleName = is_string($rule) ? (strpos($rule, ':') ? explode(':', $rule)[0] : $rule) : $rule;
+            if (in_array($ruleName, ['require', 'required'])) {
+                $hasRequireRule = true;
+                break;
+            }
+        }
+
+        // 如果字段值为空且没有require规则，跳过验证
+        if (!$hasRequireRule && ($value === '' || $value === null)) {
+            return true;
         }
 
         foreach ($rules as $key => $rule) {
@@ -650,9 +708,14 @@ class Validate
                 $param = $info;
             }
 
-            // 检查方法是否存在，如果不存在则通过is方法调用
+            // 检查方法是否存在，如果不存在则通过is方法调用或自定义规则
             if (!method_exists($this, $method)) {
-                $result = $this->is($value, $method, $data);
+                // 先检查是否是自定义规则
+                if (isset(self::$type[$method])) {
+                    $result = call_user_func_array(self::$type[$method], [$value, $param, $data, $field]);
+                } else {
+                    $result = $this->is($value, $method, $data);
+                }
             } else {
                 $result = $this->$method($value, $param, $data, $field, $title);
             }
