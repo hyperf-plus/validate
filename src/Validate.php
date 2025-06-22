@@ -40,6 +40,12 @@ class Validate
      * @var array
      */
     protected $field = [];
+    
+    /**
+     * 字段属性名称（用于错误消息）
+     * @var array
+     */
+    protected $attributes = [];
 
     /**
      * 默认规则提示
@@ -262,6 +268,18 @@ class Validate
             $this->message[$name] = $message;
         }
 
+        return $this;
+    }
+    
+    /**
+     * 设置字段属性名称
+     * @access public
+     * @param array $attributes 属性名称数组
+     * @return Validate
+     */
+    public function setAttributes(array $attributes)
+    {
+        $this->attributes = array_merge($this->attributes, $attributes);
         return $this;
     }
 
@@ -1439,6 +1457,11 @@ class Validate
      */
     protected function getRuleMsg($attribute, $title, $type, $rule)
     {
+        // 优先使用自定义属性名称
+        if (isset($this->attributes[$attribute])) {
+            $title = $this->attributes[$attribute];
+        }
+        
         if (isset($this->message[$attribute . '.' . $type])) {
             $msg = $this->message[$attribute . '.' . $type];
         } elseif (isset($this->message[$attribute][$type])) {

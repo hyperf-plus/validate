@@ -25,7 +25,10 @@ class ConfigProvider
                 // 注册验证切面
                 Aspect\ValidationAspect::class,
             ],
-            'listeners' => [],
+            'listeners' => [
+                // 注册启动监听器
+                Listener\BootValidationListener::class,
+            ],
             'publish' => [],
         ];
     }
