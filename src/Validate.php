@@ -818,6 +818,7 @@ class Validate
                 $result = in_array($value, [true, false, 0, 1, '0', '1'], true);
                 break;
             case 'number':
+            case 'numeric':
                 $result = is_numeric($value);
                 break;
             case 'array':
@@ -1430,6 +1431,9 @@ class Validate
             return $key;
         }
 
+        // 支持方括号嵌套访问 data[user][name] 或 data.user.name
+        $key = $this->parseNestedKey($key);
+        
         // 支持多级嵌套字段
         if (strpos($key, '.') !== false) {
             $keys = explode('.', $key);
@@ -1444,6 +1448,26 @@ class Validate
 
         // 单级键，直接访问
         return isset($data[$key]) ? $data[$key] : null;
+    }
+
+    /**
+     * 解析嵌套键名，将方括号格式转换为点号格式
+     * @access protected
+     * @param string $key 原始键名
+     * @return string 转换后的键名
+     */
+    protected function parseNestedKey($key)
+    {
+        // 将方括号形式转换为点号形式
+        // 例如: data[user][name] -> data.user.name
+        // 例如: data[0][name] -> data.0.name
+        // 例如: data[*] -> data.*
+        if (strpos($key, '[') !== false) {
+            // 处理方括号格式
+            $key = preg_replace('/\[([^\]]+)\]/', '.$1', $key);
+        }
+        
+        return $key;
     }
 
     /**
