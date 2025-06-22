@@ -1,6 +1,7 @@
 <?php
 
 declare (strict_types=1);
+
 namespace HPlus\Validate\Aspect;
 
 use HPlus\Validate\Annotations\RequestValidation;
@@ -22,22 +23,22 @@ class ValidationAspect extends AbstractAspect
      * @var ContainerInterface
      */
     protected $container;
-    
+
     /**
      * @var ServerRequestInterface
      */
     protected $request;
-    
+
     /**
      * 验证规则缓存（常驻内存）
      */
     private static array $ruleCache = [];
-    
+
     /**
      * 验证器实例缓存
      */
     private static array $validatorCache = [];
-    
+
     /**
      * 缓存统计信息
      */
@@ -46,16 +47,16 @@ class ValidationAspect extends AbstractAspect
         'misses' => 0,
         'total' => 0,
     ];
-    
+
     // 要切入的类，可以多个，亦可通过 :: 标识到具体的某个方法，通过 * 可以模糊匹配
     public array $annotations = [Validation::class, RequestValidation::class];
-    
+
     public function __construct(ContainerInterface $container, ServerRequestInterface $Request)
     {
         $this->container = $container;
         $this->request = $this->container->get(ServerRequestInterface::class);
     }
-    
+
     /**
      * @param ProceedingJoinPoint $proceedingJoinPoint
      * @return mixed
@@ -67,9 +68,9 @@ class ValidationAspect extends AbstractAspect
         $className = $proceedingJoinPoint->className;
         $methodName = $proceedingJoinPoint->methodName;
         $cacheKey = $className . '@' . $methodName;
-        
+
         self::$cacheStats['total']++;
-        
+
         // 从内存缓存获取验证规则
         if (!isset(self::$ruleCache[$cacheKey])) {
             self::$cacheStats['misses']++;
@@ -77,24 +78,24 @@ class ValidationAspect extends AbstractAspect
         } else {
             self::$cacheStats['hits']++;
         }
-        
+
         $validationRules = self::$ruleCache[$cacheKey];
-        
+
         // 执行验证
         foreach ($validationRules as $rule) {
             $this->executeValidation($rule, $proceedingJoinPoint);
         }
-        
+
         return $proceedingJoinPoint->process();
     }
-    
+
     /**
      * 解析验证规则（仅在首次请求时执行）
      */
     private function parseValidationRules(ProceedingJoinPoint $proceedingJoinPoint): array
     {
         $rules = [];
-        
+
         foreach ($proceedingJoinPoint->getAnnotationMetadata()->method as $validation) {
             switch (true) {
                 case $validation instanceof RequestValidation:
@@ -107,7 +108,7 @@ class ValidationAspect extends AbstractAspect
                         'attributes' => $validation->attributes ?? [],
                     ];
                     break;
-                    
+
                 case $validation instanceof Validation:
                     $rules[] = [
                         'type' => 'field',
@@ -120,17 +121,17 @@ class ValidationAspect extends AbstractAspect
                     break;
             }
         }
-        
+
         return $rules;
     }
-    
+
     /**
      * 执行验证（使用缓存的规则）
      */
     private function executeValidation(array $rule, ProceedingJoinPoint $proceedingJoinPoint): void
     {
         $validation = $rule['validation'];
-        
+
         switch ($rule['type']) {
             case 'request':
                 // 获取所有请求数据（GET + POST/PUT）
@@ -144,7 +145,7 @@ class ValidationAspect extends AbstractAspect
             default:
                 return;
         }
-        
+
         $this->validationData(
             $validation,
             $verData,
@@ -153,7 +154,7 @@ class ValidationAspect extends AbstractAspect
             $rule['type'] === 'request'
         );
     }
-    
+
     /**
      * @param $validation
      * @param $verData
@@ -170,12 +171,12 @@ class ValidationAspect extends AbstractAspect
         /**
          * @var Validate $validate
          */
-        
+
         // 使用缓存的验证器实例
         $validate = $this->getValidator($rule);
-        
+
         $rules = $rule['rules'] ?? null;
-        
+
         if ($rules === null && isset($rule['validate'])) {
             $class = $rule['validate'];
             if (!class_exists($class)) {
@@ -183,20 +184,20 @@ class ValidationAspect extends AbstractAspect
             }
             $rules = $validate->getSceneRule($rule['scene']);
         }
-        
+
         // 设置自定义消息和属性（如果有）
         if (!empty($rule['messages'])) {
             $validate->message($rule['messages']);
         }
-        
+
         if (!empty($rule['attributes'])) {
             $validate->setAttributes($rule['attributes']);
         }
-        
+
         if ($validate->batch($validation->batch)->check($verData, $rules, $rule['scene']) === false) {
             throw new ValidateException((string)$validate->getError());
         }
-        
+
         if ($validation->security) {
             $fields = $this->getFields($rules);
             foreach ($verData as $key => $item) {
@@ -205,16 +206,16 @@ class ValidationAspect extends AbstractAspect
                 }
             }
         }
-        
+
         if ($validation->filter) {
             $fields = $this->getFields($rules);
-            $verData = array_filter($verData, function ($value, $key) use($fields) {
+            $verData = array_filter($verData, function ($value, $key) use ($fields) {
                 return in_array($key, $fields);
             }, ARRAY_FILTER_USE_BOTH);
-            
+
             switch ($isRequest) {
                 case true:
-                    Context::override(ServerRequestInterface::class, function (ServerRequestInterface $request) use($verData) {
+                    Context::override(ServerRequestInterface::class, function (ServerRequestInterface $request) use ($verData) {
                         return $request->withParsedBody($verData);
                     });
                     break;
@@ -224,7 +225,7 @@ class ValidationAspect extends AbstractAspect
             }
         }
     }
-    
+
     /**
      * 获取验证器实例（使用缓存）
      */
@@ -232,20 +233,11 @@ class ValidationAspect extends AbstractAspect
     {
         if (isset($rule['validate']) && class_exists($rule['validate'])) {
             $class = $rule['validate'];
-            if (!isset(self::$validatorCache[$class])) {
-                self::$validatorCache[$class] = new $class();
-            }
-            return self::$validatorCache[$class];
+            return new $class();
         }
-        
-        // 默认验证器
-        if (!isset(self::$validatorCache['default'])) {
-            self::$validatorCache['default'] = new Validate();
-        }
-        
-        return self::$validatorCache['default'];
+        return  new Validate();
     }
-    
+
     protected function getFields(array $rules)
     {
         $fields = [];
@@ -255,13 +247,13 @@ class ValidationAspect extends AbstractAspect
             }
             if (strpos($field, '|')) {
                 // 字段|描述 用于指定属性名称
-                list($field, ) = explode('|', $field);
+                list($field,) = explode('|', $field);
             }
             $fields[] = $field;
         }
         return $fields;
     }
-    
+
     /**
      * 获取缓存统计信息
      */
@@ -271,14 +263,14 @@ class ValidationAspect extends AbstractAspect
             'hits' => self::$cacheStats['hits'],
             'misses' => self::$cacheStats['misses'],
             'total' => self::$cacheStats['total'],
-            'hit_rate' => self::$cacheStats['total'] > 0 
+            'hit_rate' => self::$cacheStats['total'] > 0
                 ? round(self::$cacheStats['hits'] / self::$cacheStats['total'] * 100, 2) . '%'
                 : '0%',
             'rule_cache_size' => count(self::$ruleCache),
             'validator_cache_size' => count(self::$validatorCache),
         ];
     }
-    
+
     /**
      * 清空缓存（用于热更新）
      */
