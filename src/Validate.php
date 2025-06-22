@@ -5,6 +5,7 @@ namespace HPlus\Validate;
 use SplFileInfo;
 use SplFileObject;
 use Hyperf\DbConnection\Db;
+use Hyperf\HttpMessage\Upload\UploadedFile;
 
 class Validate
 {
@@ -100,6 +101,7 @@ class Validate
         'fileExt' => '上传文件后缀不符',
         'fileMime' => '上传文件类型不符',
         'unique' => ':attribute 已存在',
+        'sometimes' => ':attribute规则验证失败',
     ];
 
     /**
@@ -586,6 +588,24 @@ class Validate
             $rules = array_merge($rules, $this->append[$field]);
         }
 
+        // 检查是否包含 sometimes 规则
+        $hasSometimes = false;
+        if (is_array($rules)) {
+            foreach ($rules as $rule) {
+                if (is_string($rule) && ($rule === 'sometimes' || str_contains($rule, 'sometimes'))) {
+                    $hasSometimes = true;
+                    break;
+                }
+            }
+        } else if (is_string($rules) && str_contains($rules, 'sometimes')) {
+            $hasSometimes = true;
+        }
+
+        // sometimes 规则：字段不存在时跳过所有验证
+        if ($hasSometimes && !array_key_exists($field, $data)) {
+            return true;
+        }
+
         $i = 0;
         foreach ($rules as $key => $rule) {
             if ($rule instanceof \Closure) {
@@ -601,9 +621,23 @@ class Validate
                     continue;
                 }
 
+                // 跳过 sometimes 规则本身，它只是一个标记
+                if ('sometimes' === $info) {
+                    $i++;
+                    continue;
+                }
+
                 if ('must' == $info || 0 === strpos($info, 'require') || (!is_null($value) && '' !== $value)) {
                     // 验证类型
-                    $callback = isset(self::$type[$type]) ? self::$type[$type] : [$this, $type];
+                    if (isset(self::$type[$type])) {
+                        $callback = self::$type[$type];
+                    } elseif (method_exists($this, $type)) {
+                        $callback = [$this, $type];
+                    } else {
+                        // 不支持的验证规则
+                        return "验证规则 {$type} 无效，暂不支持";
+                    }
+                    
                     // 验证数据
                     $result = call_user_func_array($callback, [$value, $rule, $data, $field, $title]);
                 } else {
@@ -1208,7 +1242,7 @@ class Validate
     {
         if (is_array($value)) {
             $length = count($value);
-        } elseif ($value instanceof File) {
+        } elseif ($value instanceof UploadedFile) {
             $length = $value->getSize();
         } else {
             $length = mb_strlen((string)$value);
@@ -1235,7 +1269,7 @@ class Validate
     {
         if (is_array($value)) {
             $length = count($value);
-        } elseif ($value instanceof File) {
+        } elseif ($value instanceof UploadedFile) {
             $length = $value->getSize();
         } else {
             $length = mb_strlen((string)$value);
@@ -1255,7 +1289,7 @@ class Validate
     {
         if (is_array($value)) {
             $length = count($value);
-        } elseif ($value instanceof File) {
+        } elseif ($value instanceof UploadedFile) {
             $length = $value->getSize();
         } else {
             $length = mb_strlen((string)$value);
@@ -1388,6 +1422,21 @@ class Validate
         return true;
     }
 
+    /**
+     * 有时验证规则（字段存在时才验证）
+     * @access public
+     * @param mixed $value 字段值
+     * @param mixed $rule 验证规则
+     * @param array $data 数据
+     * @param string $field 字段名
+     * @return bool
+     */
+    public function sometimes($value, $rule, array $data = [], string $field = ''): bool
+    {
+        // sometimes 规则的逻辑是：字段存在时才进行验证
+        // 这个方法实际上在 checkItem 中被特殊处理
+        return true;
+    }
 
     /**
      * 使用正则验证数据
@@ -1433,7 +1482,7 @@ class Validate
 
         // 支持方括号嵌套访问 data[user][name] 或 data.user.name
         $key = $this->parseNestedKey($key);
-        
+
         // 支持多级嵌套字段
         if (strpos($key, '.') !== false) {
             $keys = explode('.', $key);

@@ -133,10 +133,13 @@ class ValidationAspect extends AbstractAspect
         
         switch ($rule['type']) {
             case 'request':
-                $verData = $this->request->all();
+                // 获取所有请求数据（GET + POST/PUT）
+                $queryParams = $this->request->getQueryParams();
+                $bodyParams = $this->request->getParsedBody() ?: [];
+                $verData = array_merge($queryParams, $bodyParams);
                 break;
             case 'field':
-                $verData = $proceedingJoinPoint->arguments['keys'][$rule['field']];
+                $verData = $proceedingJoinPoint->arguments['keys'][$rule['field']] ?? null;
                 break;
             default:
                 return;

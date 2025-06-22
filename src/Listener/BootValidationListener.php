@@ -35,7 +35,7 @@ class BootValidationListener implements ListenerInterface
         ];
     }
 
-    public function process(object $event)
+    public function process(object $event): void
     {
         $startTime = microtime(true);
         $ruleCount = 0;
