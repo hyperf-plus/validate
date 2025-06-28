@@ -9,51 +9,62 @@ use Hyperf\Di\Annotation\AbstractAnnotation;
 class RequestValidation extends AbstractAnnotation
 {
     /**
-     * @param array $rules
-     * @param string|null $validate
-     * @param string|null $scene
-     * @param bool $filter
-     * @param bool $security
-     * @param bool $batch
-     * @param string $dateType
+     * @param array $rules 验证规则
+     * @param string|null $validate 验证器类
+     * @param string|null $scene 验证场景
+     * @param bool $filter 是否过滤多余字段
+     * @param bool $security 安全模式
+     * @param bool $batch 是否批量验证
+     * @param string $dataType 验证数据类型
+     * @param array $messages 自定义错误消息
+     * @param array $attributes 字段属性名称映射
      */
     public function __construct(
         /**
-         * 规则类
-         * @var string
+         * 验证规则
+         * @var array
          */
-        public array   $rules = [],
+        public array $rules = [],
         /**
-         * 验证器
-         * @var string
+         * 验证器类
+         * @var string|null
          */
         public ?string $validate = null,
         /**
-         * 场景
-         * @var string
+         * 验证场景
+         * @var string|null
          */
         public ?string $scene = null,
         /**
          * 是否过滤多余字段
          * @var bool
          */
-        public bool    $filter = false,
+        public bool $filter = false,
         /**
-         * 安全模式严格按照规则字段，如果多字段会抛出异常
+         * 安全模式：严格按照规则字段，如果有多字段会抛出异常
          * @var bool
          */
-        public bool    $security = false,
+        public bool $security = false,
         /**
          * 是否批量验证
          * @var bool
          */
-        public bool    $batch = false,
+        public bool $batch = false,
         /**
          * 验证数据类型，支持json|xml|form表单
          * @var string
          */
-        public string  $dateType = 'json'
-    )
-    {
+        public string $dataType = 'json',
+        /**
+         * 自定义错误消息
+         * @var array
+         */
+        public array $messages = [],
+        /**
+         * 字段属性名称映射
+         * @var array
+         */
+        public array $attributes = []
+    ) {
     }
 }
