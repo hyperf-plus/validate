@@ -5,6 +5,7 @@ namespace HPlus\Validate;
 use SplFileInfo;
 use SplFileObject;
 use Hyperf\DbConnection\Db;
+use Hyperf\HttpMessage\Upload\UploadedFile;
 
 class Validate
 {
@@ -33,7 +34,58 @@ class Validate
      * 验证提示信息
      * @var array
      */
-    protected $message = [];
+    protected $message = [
+        'require'     => ':attribute不能为空',
+        'must'        => ':attribute必须',
+        'number'      => ':attribute必须是数字',
+        'integer'     => ':attribute必须是整数',
+        'float'       => ':attribute必须是浮点数',
+        'boolean'     => ':attribute必须是布尔值',
+        'email'       => ':attribute格式不符',
+        'mobile'      => ':attribute手机号格式不正确',
+        'array'       => ':attribute必须是数组',
+        'accepted'    => ':attribute必须是yes、on或者1',
+        'date'        => ':attribute格式不符合',
+        'file'        => ':attribute不是有效的上传文件',
+        'image'       => ':attribute不是有效的图像文件',
+        'alpha'       => ':attribute只能是字母',
+        'alphaNum'    => ':attribute只能是字母和数字',
+        'alphaDash'   => ':attribute只能是字母、数字和下划线_及破折号-',
+        'activeUrl'   => ':attribute不是有效的域名或者IP',
+        'chs'         => ':attribute只能是汉字',
+        'chsAlpha'    => ':attribute只能是汉字、字母',
+        'chsAlphaNum' => ':attribute只能是汉字、字母和数字',
+        'chsDash'     => ':attribute只能是汉字、字母、数字和下划线_及破折号-',
+        'url'         => ':attribute不是有效的URL地址',
+        'ip'          => ':attribute不是有效的IP地址',
+        'dateFormat'  => ':attribute必须使用日期格式 :rule',
+        'in'          => ':attribute必须在 :rule 范围内',
+        'notIn'       => ':attribute不能在 :rule 范围内',
+        'between'     => ':attribute只能在 :1 - :2 之间',
+        'notBetween'  => ':attribute不能在 :1 - :2 之间',
+        'length'      => ':attribute长度不符合要求 :rule',
+        'max'         => ':attribute长度不能超过 :rule',
+        'min'         => ':attribute长度不能小于 :rule',
+        'after'       => ':attribute日期不能小于 :rule',
+        'before'      => ':attribute日期不能超过 :rule',
+        'expire'      => '不在有效期内 :rule',
+        'allowIp'     => '不允许的IP访问',
+        'denyIp'      => '禁止的IP访问',
+        'confirm'     => ':attribute和确认字段不一致',
+        'different'   => ':attribute和比较字段必须不同',
+        'egt'         => ':attribute必须大于等于 :rule',
+        'gt'          => ':attribute必须大于 :rule',
+        'elt'         => ':attribute必须小于等于 :rule',
+        'lt'          => ':attribute必须小于 :rule',
+        'eq'          => ':attribute必须等于 :rule',
+        'unique'      => ':attribute已存在',
+        'regex'       => ':attribute不符合指定规则',
+        'method'      => '无效的请求类型',
+        'token'       => '令牌数据无效',
+        'fileSize'    => '上传文件大小不符',
+        'fileExt'     => '上传文件后缀不符',
+        'fileMime'    => '上传文件类型不符',
+    ];
 
     /**
      * 验证字段描述
@@ -100,6 +152,7 @@ class Validate
         'fileExt' => '上传文件后缀不符',
         'fileMime' => '上传文件类型不符',
         'unique' => ':attribute 已存在',
+        'sometimes' => ':attribute规则验证失败',
     ];
 
     /**
@@ -412,6 +465,8 @@ class Validate
             }
         }
 
+
+
         foreach ($rules as $key => $rule) {
 
             // field => 'rule1|rule2...' field => ['rule1','rule2',...]
@@ -470,10 +525,14 @@ class Validate
                     $result = $this->checkItem($key, $value, $rule, $data, $title);
                     break;
             }
+
             if (true !== $result) {
                 // 没有返回true 则表示验证失败
                 if (!empty($this->batch)) {
                     // 批量验证
+                    if (!is_array($this->error)) {
+                        $this->error = [];
+                    }
                     if (is_array($result)) {
                         $this->error = array_merge($this->error, $result);
                     } else {
@@ -559,82 +618,124 @@ class Validate
     }
 
     /**
-     * 验证单个字段规则
-     * @access protected
+     * 验证单个字段
      * @param string $field 字段名
      * @param mixed $value 字段值
-     * @param mixed $rules 验证规则
-     * @param array $data 数据
-     * @param string $title 字段描述
-     * @param array $msg 提示信息
-     * @return mixed
+     * @param array|string $rules 验证规则
+     * @param array $data 所有数据
+     * @param string $title 字段显示名
+     * @param array $msg 错误信息
+     * @return bool|string
      */
-    protected function checkItem($field, $value, $rules, $data, $title = '', $msg = [])
+    protected function checkItem(string $field, $value, $rules, array $data, string $title, array $msg = [])
     {
-        if (isset($this->remove[$field]) && true === $this->remove[$field] && empty($this->append[$field])) {
-            // 字段已经移除 无需验证
-            return true;
-        }
-
-        // 支持多规则验证 require|in:a,b,c|... 或者 ['require','in'=>'a,b,c',...]
         if (is_string($rules)) {
             $rules = explode('|', $rules);
         }
 
-        if (isset($this->append[$field])) {
-            // 追加额外的验证规则
-            $rules = array_merge($rules, $this->append[$field]);
-        }
-
-        $i = 0;
+        // 首先检查条件必填规则（requireIf, requireWith等）
         foreach ($rules as $key => $rule) {
-            if ($rule instanceof \Closure) {
-                $result = call_user_func_array($rule, [$value, $data]);
-                $info = is_numeric($key) ? '' : $key;
+            $info = is_numeric($key) ? $rule : $key;
+            if (is_string($info)) {
+                if (strpos($info, ':')) {
+                    [$method, $param] = explode(':', $info, 2);
+                } else {
+                    $method = $info;
+                    $param = null;
+                }
             } else {
-                // 判断验证类型
-                list($type, $rule, $info) = $this->getValidateType($key, $rule);
-
-                if (isset($this->remove[$field]) && in_array($info, $this->remove[$field])) {
-                    // 规则已经移除
-                    $i++;
-                    continue;
-                }
-
-                if ('must' == $info || 0 === strpos($info, 'require') || (!is_null($value) && '' !== $value)) {
-                    // 验证类型
-                    $callback = isset(self::$type[$type]) ? self::$type[$type] : [$this, $type];
-                    // 验证数据
-                    $result = call_user_func_array($callback, [$value, $rule, $data, $field, $title]);
-                } else {
-                    $result = true;
-                }
+                $method = $key;
+                $param = $info;
             }
 
-            if (false === $result) {
-                // 验证失败 返回错误信息
-                if (!empty($msg[$i])) {
-                    $message = $msg[$i];
-                } else {
-                    $message = $this->getRuleMsg($field, $title, $info, $rule);
+            // 如果是条件必填规则，先执行它来决定是否需要验证
+            if (in_array($method, ['requireIf', 'requireWith', 'requireCallback'])) {
+                $requireResult = $this->$method($value, $param, $data, $field, $title);
+                
+                // 如果条件必填验证失败，直接返回错误
+                if (true !== $requireResult) {
+                    $errorMsg = $this->getRuleMsg($field, $title, $method, $param);
+                    $this->error = $errorMsg;
+                    return $errorMsg;
                 }
-
-                return $message;
-            } elseif (true !== $result) {
-                // 返回自定义错误信息
-                if (is_string($result) && false !== strpos($result, ':')) {
-                    $result = str_replace(
-                        [':attribute', ':rule'],
-                        [$title, (string)$rule],
-                        $result);
+                
+                // 如果条件不满足（requireIf返回true但字段为空），跳过所有其他验证
+                if (($value === '' || $value === null) && $requireResult === true) {
+                    // 检查条件是否真的满足
+                    if ($method === 'requireIf') {
+                        list($checkField, $checkVal) = explode(',', $param);
+                        if ($this->getDataValue($data, $checkField) != $checkVal) {
+                            return true; // 条件不满足，跳过验证
+                        }
+                    } elseif ($method === 'requireWith') {
+                        $checkVal = $this->getDataValue($data, $param);
+                        if (empty($checkVal)) {
+                            return true; // 条件不满足，跳过验证
+                        }
+                    }
                 }
-
-                return $result;
             }
-            $i++;
         }
 
-        return $result;
+        // 检查是否有普通require规则
+        $hasRequireRule = false;
+        foreach ($rules as $rule) {
+            $ruleName = is_string($rule) ? (strpos($rule, ':') ? explode(':', $rule)[0] : $rule) : $rule;
+            if (in_array($ruleName, ['require', 'required'])) {
+                $hasRequireRule = true;
+                break;
+            }
+        }
+
+        // 如果字段值为空且没有require规则，跳过验证
+        if (!$hasRequireRule && ($value === '' || $value === null)) {
+            return true;
+        }
+
+        foreach ($rules as $key => $rule) {
+            $info = is_numeric($key) ? $rule : $key;
+
+            if (is_string($info)) {
+                // 解析验证规则和参数
+                if (strpos($info, ':')) {
+                    [$method, $param] = explode(':', $info, 2);
+                } else {
+                    $method = $info;
+                    $param = null;
+                }
+            } else {
+                $method = $key;
+                $param = $info;
+            }
+
+            // 检查方法是否存在，如果不存在则通过is方法调用或自定义规则
+            if (!method_exists($this, $method)) {
+                // 先检查是否是自定义规则
+                if (isset(self::$type[$method])) {
+                    $result = call_user_func_array(self::$type[$method], [$value, $param, $data, $field]);
+                } else {
+                    $result = $this->is($value, $method, $data);
+                }
+            } else {
+                $result = $this->$method($value, $param, $data, $field, $title);
+            }
+
+            if (true !== $result) {
+                // 获取错误消息
+                $errorMsg = $this->getRuleMsg($field, $title, $method, $param);
+                
+                if (is_array($msg) && !empty($msg)) {
+                    $message = $msg[$field . '.' . $method] ?? $msg[$field] ?? $msg[$method] ?? $errorMsg;
+                } else {
+                    $message = is_string($result) ? $result : $errorMsg;
+                }
+
+                $this->error = $message;
+                return $message;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -818,6 +919,7 @@ class Validate
                 $result = in_array($value, [true, false, 0, 1, '0', '1'], true);
                 break;
             case 'number':
+            case 'numeric':
                 $result = is_numeric($value);
                 break;
             case 'array':
@@ -1207,7 +1309,7 @@ class Validate
     {
         if (is_array($value)) {
             $length = count($value);
-        } elseif ($value instanceof File) {
+        } elseif ($value instanceof UploadedFile) {
             $length = $value->getSize();
         } else {
             $length = mb_strlen((string)$value);
@@ -1234,7 +1336,7 @@ class Validate
     {
         if (is_array($value)) {
             $length = count($value);
-        } elseif ($value instanceof File) {
+        } elseif ($value instanceof UploadedFile) {
             $length = $value->getSize();
         } else {
             $length = mb_strlen((string)$value);
@@ -1254,7 +1356,7 @@ class Validate
     {
         if (is_array($value)) {
             $length = count($value);
-        } elseif ($value instanceof File) {
+        } elseif ($value instanceof UploadedFile) {
             $length = $value->getSize();
         } else {
             $length = mb_strlen((string)$value);
@@ -1387,6 +1489,42 @@ class Validate
         return true;
     }
 
+    /**
+     * 验证是否为有效的手机号
+     * @access public
+     * @param mixed $value 字段值
+     * @param mixed $rule 验证规则
+     * @param array $data 数据
+     * @param string $field 字段名
+     * @param string $title 字段描述
+     * @return bool|string
+     */
+    public function mobile($value, $rule = null, array $data = [], string $field = '', string $title = '')
+    {
+        if (empty($value)) {
+            return false;
+        }
+
+        $pattern = '/^1[3-9]\d{9}$/';
+        return preg_match($pattern, $value) ? true : false;
+    }
+
+    /**
+     * 验证sometimes规则 - 字段存在时才验证
+     * @access protected  
+     * @param mixed $value 字段值
+     * @param mixed $rule 验证规则
+     * @param array $data 数据
+     * @param string $field 字段名
+     * @param string $title 字段描述
+     * @return bool
+     */
+    protected function sometimes($value, $rule, array $data, string $field, string $title)
+    {
+        // sometimes规则本身不需要验证逻辑，只是一个标记
+        // 实际逻辑在checkItem方法中处理
+        return true;
+    }
 
     /**
      * 使用正则验证数据
@@ -1430,6 +1568,9 @@ class Validate
             return $key;
         }
 
+        // 支持方括号嵌套访问 data[user][name] 或 data.user.name
+        $key = $this->parseNestedKey($key);
+
         // 支持多级嵌套字段
         if (strpos($key, '.') !== false) {
             $keys = explode('.', $key);
@@ -1444,6 +1585,26 @@ class Validate
 
         // 单级键，直接访问
         return isset($data[$key]) ? $data[$key] : null;
+    }
+
+    /**
+     * 解析嵌套键名，将方括号格式转换为点号格式
+     * @access protected
+     * @param string $key 原始键名
+     * @return string 转换后的键名
+     */
+    protected function parseNestedKey($key)
+    {
+        // 将方括号形式转换为点号形式
+        // 例如: data[user][name] -> data.user.name
+        // 例如: data[0][name] -> data.0.name
+        // 例如: data[*] -> data.*
+        if (strpos($key, '[') !== false) {
+            // 处理方括号格式
+            $key = preg_replace('/\[([^\]]+)\]/', '.$1', $key);
+        }
+        
+        return $key;
     }
 
     /**
@@ -1476,7 +1637,7 @@ class Validate
             $msg = $title . '规则不符';
         }
 
-        if (is_string($msg) && is_scalar($rule) && false !== strpos($msg, ':')) {
+        if (is_string($msg) && false !== strpos($msg, ':')) {
             // 变量替换
             if (is_string($rule) && strpos($rule, ',')) {
                 $array = array_pad(explode(',', $rule), 3, '');
