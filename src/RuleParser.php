@@ -56,6 +56,7 @@ class RuleParser
         'array' => 'array',
         'json' => 'object',
         'string' => 'string',
+        'nullable' => null, // nullable 不改变类型
     ];
 
     /**
@@ -71,6 +72,8 @@ class RuleParser
         'ipv4' => 'ipv4',
         'ipv6' => 'ipv6',
         'regex' => null, // 使用pattern代替
+        'after_or_equal' => 'date',
+        'afterOrEqual' => 'date',
     ];
 
     /**
@@ -95,6 +98,9 @@ class RuleParser
                 'digits_between' => '/\bdigits_between:(\d+),(\d+)\b/',
                 'required_if' => '/\brequired_if:([^|]+)/',
                 'required_with' => '/\brequired_with:([^|]+)/',
+                'default' => '/\bdefault:([^|]+)/',
+                'after_or_equal' => '/\bafter_or_equal:([^|]+)/',
+                'afterOrEqual' => '/\bafterOrEqual:([^|]+)/',
             ];
         }
     }
@@ -326,6 +332,31 @@ class RuleParser
             $schema['nullable'] = true;
         }
 
+        // 默认值
+        if (preg_match(self::$compiledRegex['default'], $rule, $matches)) {
+            $defaultValue = trim($matches[1]);
+            
+            // 类型转换
+            if ($defaultValue === 'true') {
+                $schema['default'] = true;
+            } elseif ($defaultValue === 'false') {
+                $schema['default'] = false;
+            } elseif ($defaultValue === 'null') {
+                $schema['default'] = null;
+            } elseif (is_numeric($defaultValue)) {
+                $schema['default'] = strpos($defaultValue, '.') !== false ? (float)$defaultValue : (int)$defaultValue;
+            } else {
+                $schema['default'] = $defaultValue;
+            }
+        }
+
+        // 日期约束
+        if (preg_match(self::$compiledRegex['after_or_equal'], $rule, $matches) ||
+            preg_match(self::$compiledRegex['afterOrEqual'], $rule, $matches)) {
+            $schema['format'] = 'date';
+            $schema['minimum'] = $matches[1];
+        }
+
         // 只读
         if (str_contains($rule, 'readonly')) {
             $schema['readOnly'] = true;
@@ -448,6 +479,33 @@ class RuleParser
     }
 
     /**
+     * 检查规则是否包含默认值
+     */
+    public static function hasDefaultValue(string $rule): bool
+    {
+        return str_contains($rule, 'default:');
+    }
+
+    /**
+     * 检查规则是否包含日期约束
+     */
+    public static function hasDateConstraint(string $rule): bool
+    {
+        return str_contains($rule, 'after_or_equal:') || 
+               str_contains($rule, 'afterOrEqual:') ||
+               str_contains($rule, 'after:') ||
+               str_contains($rule, 'before:');
+    }
+
+    /**
+     * 检查规则是否为数组元素验证
+     */
+    public static function isArrayElementRule(string $fieldName): bool
+    {
+        return str_contains($fieldName, '.*');
+    }
+
+    /**
      * 批量解析字段名（性能优化）
      */
     public static function batchParseFieldNames(array $fields): array
@@ -480,7 +538,9 @@ class RuleParser
      */
     public static function getDefaultValue(string $rule): mixed
     {
-        if (preg_match('/\bdefault:([^|]+)/', $rule, $matches)) {
+        self::initRegex();
+        
+        if (preg_match(self::$compiledRegex['default'], $rule, $matches)) {
             $default = trim($matches[1]);
             
             // 类型转换

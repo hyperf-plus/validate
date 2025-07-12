@@ -21,7 +21,7 @@ class Validate
      * @var array
      */
     protected $alias = [
-        '>' => 'gt', '>=' => 'egt', '<' => 'lt', '<=' => 'elt', '=' => 'eq', 'same' => 'eq',
+        '>' => 'gt', '>=' => 'egt', '<' => 'lt', '<=' => 'elt', '=' => 'eq',
     ];
 
     /**
@@ -87,6 +87,7 @@ class Validate
         'fileMime'    => '上传文件类型不符',
         'nullable'    => ':attribute可为空',
         'afterOrEqual' => ':attribute日期不能小于 :rule',
+        'same'        => ':attribute必须和 :rule 相同',
     ];
 
     /**
@@ -157,6 +158,7 @@ class Validate
         'sometimes' => ':attribute规则验证失败',
         'nullable' => ':attribute可为空',
         'afterOrEqual' => ':attribute日期不能小于 :rule',
+        'same' => ':attribute必须和 :rule 相同',
     ];
 
     /**
@@ -469,7 +471,11 @@ class Validate
             }
         }
 
+        // 处理默认值
+        $data = $this->applyDefaultValues($data, $rules);
 
+        // 处理数组元素验证规则
+        $rules = $this->expandArrayRules($rules, $data);
 
         foreach ($rules as $key => $rule) {
 
@@ -785,6 +791,20 @@ class Validate
     }
 
     /**
+     * 验证是否和某个字段的值相同
+     * @access public
+     * @param mixed $value 字段值
+     * @param mixed $rule 验证规则 - 要比较的字段名
+     * @param array $data 数据
+     * @param string $field 字段名
+     * @return bool
+     */
+    public function same($value, $rule, $data = [], $field = '')
+    {
+        return $this->getDataValue($data, $rule) === $value;
+    }
+
+    /**
      * 验证是否和某个字段的值一致
      * @access public
      * @param mixed $value 字段值
@@ -959,6 +979,10 @@ class Validate
                 break;
             case 'image':
                 $result = $value instanceof SplFileObject && in_array($this->getImageType($value->getRealPath()), [1, 2, 3, 6]);
+                break;
+            case 'afterOrEqual':
+                // 日期大于等于验证 - 这里需要参数，通常不会通过 is() 方法调用
+                $result = true;
                 break;
             default:
                 if (isset(self::$type[$rule])) {
@@ -1406,7 +1430,19 @@ class Validate
     }
 
     /**
-     * 验证日期
+     * 验证是否在某个日期之后或等于
+     * @access public
+     * @param mixed $value 字段值
+     * @param mixed $rule 验证规则
+     * @return bool
+     */
+    public function afterOrEqual($value, $rule)
+    {
+        return strtotime($value) >= strtotime($rule);
+    }
+
+    /**
+     * 验证是否在某个日期之前
      * @access public
      * @param mixed $value 字段值
      * @param mixed $rule 验证规则
@@ -1735,6 +1771,136 @@ class Validate
     public function getSceneRule(string $name)
     {
         return $this->scene[$name] ?? $this->rule;
+    }
+
+    /**
+     * 应用默认值
+     * @access protected
+     * @param array $data 数据
+     * @param array $rules 验证规则
+     * @return array
+     */
+    protected function applyDefaultValues(array $data, array $rules): array
+    {
+        foreach ($rules as $key => $rule) {
+            // field => 'rule1|rule2...' field => ['rule1','rule2',...]
+            if (is_numeric($key)) {
+                $key = $rule;
+                $rule = $this->rule[$key] ?? '';
+            }
+
+            if (empty($rule)) {
+                continue;
+            }
+
+            // field => 'rule1|rule2...' field => ['rule1','rule2',...]
+            if (strpos($key, '|')) {
+                // 字段|描述 用于指定属性名称
+                list($key, $title) = explode('|', $key);
+            }
+
+            // 解析默认值
+            $defaultValue = $this->parseDefaultValue($rule);
+            
+            if ($defaultValue !== null) {
+                // 检查字段是否存在或为空
+                if (!isset($data[$key]) || $data[$key] === '' || $data[$key] === null) {
+                    $data[$key] = $defaultValue;
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * 解析默认值
+     * @access protected
+     * @param mixed $rule 验证规则
+     * @return mixed
+     */
+    protected function parseDefaultValue($rule)
+    {
+        if (is_string($rule)) {
+            $rules = explode('|', $rule);
+        } elseif (is_array($rule)) {
+            $rules = $rule;
+        } else {
+            return null;
+        }
+
+        foreach ($rules as $r) {
+            if (is_string($r) && strpos($r, 'default:') === 0) {
+                $value = substr($r, 8); // 去除 'default:' 前缀
+                
+                // 类型转换
+                if ($value === 'true') {
+                    return true;
+                } elseif ($value === 'false') {
+                    return false;
+                } elseif ($value === 'null') {
+                    return null;
+                } elseif (is_numeric($value)) {
+                    return strpos($value, '.') !== false ? (float)$value : (int)$value;
+                } else {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 处理数组元素验证规则，将 .* 语法展开
+     * @access protected
+     * @param array $rules 验证规则
+     * @param array $data 数据
+     * @return array
+     */
+    protected function expandArrayRules(array $rules, array $data): array
+    {
+        $expandedRules = [];
+        
+        foreach ($rules as $key => $rule) {
+            if (is_numeric($key)) {
+                $key = $rule;
+                $rule = $this->rule[$key] ?? '';
+            }
+
+            // 处理字段|描述的情况
+            $originalKey = $key;
+            if (strpos($key, '|')) {
+                list($key, $title) = explode('|', $key);
+            }
+
+            // 检查是否包含 .* 语法
+            if (strpos($key, '.*') !== false) {
+                // 获取数组字段名
+                $arrayField = str_replace('.*', '', $key);
+                $arrayData = $this->getDataValue($data, $arrayField);
+                
+                if (is_array($arrayData)) {
+                    // 为数组的每个元素创建规则
+                    foreach ($arrayData as $index => $item) {
+                        $expandedKey = str_replace('.*', '.' . $index, $key);
+                        if ($originalKey !== $key) {
+                            // 保持原有的描述
+                            $expandedKey = str_replace('.*', '.' . $index, $originalKey);
+                        }
+                        $expandedRules[$expandedKey] = $rule;
+                    }
+                } else {
+                    // 如果不是数组，保持原规则用于后续错误处理
+                    $expandedRules[$originalKey] = $rule;
+                }
+            } else {
+                // 不包含 .* 的规则直接保留
+                $expandedRules[$originalKey] = $rule;
+            }
+        }
+
+        return $expandedRules;
     }
 
 }
