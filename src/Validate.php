@@ -85,6 +85,8 @@ class Validate
         'fileSize'    => '上传文件大小不符',
         'fileExt'     => '上传文件后缀不符',
         'fileMime'    => '上传文件类型不符',
+        'nullable'    => ':attribute可为空',
+        'afterOrEqual' => ':attribute日期不能小于 :rule',
     ];
 
     /**
@@ -153,6 +155,8 @@ class Validate
         'fileMime' => '上传文件类型不符',
         'unique' => ':attribute 已存在',
         'sometimes' => ':attribute规则验证失败',
+        'nullable' => ':attribute可为空',
+        'afterOrEqual' => ':attribute日期不能小于 :rule',
     ];
 
     /**
@@ -633,6 +637,21 @@ class Validate
             $rules = explode('|', $rules);
         }
 
+        // 检查是否有 nullable 规则
+        $isNullable = false;
+        foreach ($rules as $rule) {
+            $ruleName = is_string($rule) ? (strpos($rule, ':') ? explode(':', $rule)[0] : $rule) : $rule;
+            if ($ruleName === 'nullable') {
+                $isNullable = true;
+                break;
+            }
+        }
+
+        // 如果字段可为空且值为空，跳过验证
+        if ($isNullable && ($value === null || $value === '')) {
+            return true;
+        }
+
         // 首先检查条件必填规则（requireIf, requireWith等）
         foreach ($rules as $key => $rule) {
             $info = is_numeric($key) ? $rule : $key;
@@ -706,6 +725,11 @@ class Validate
             } else {
                 $method = $key;
                 $param = $info;
+            }
+
+            // 跳过 nullable 规则本身，因为已经在上面处理了
+            if ($method === 'nullable') {
+                continue;
             }
 
             // 检查方法是否存在，如果不存在则通过is方法调用或自定义规则
@@ -896,6 +920,10 @@ class Validate
             case 'required':
                 // 必须
                 $result = !empty($value) || '0' == $value;
+                break;
+            case 'nullable':
+                // 可为空
+                $result = true; // nullable 本身总是验证通过
                 break;
             case 'string':
                 // 接受
