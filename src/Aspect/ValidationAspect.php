@@ -131,6 +131,7 @@ class ValidationAspect extends AbstractAspect
                         'batch' => $validation->batch,
                         'security' => $validation->security,
                         'filter' => $validation->filter,
+                        'dataType' => $validation->dataType ?? 'json',
                     ];
                     break;
 
@@ -160,7 +161,8 @@ class ValidationAspect extends AbstractAspect
     {
         switch ($rule['type']) {
             case 'request':
-                $verData = $this->getRequestData();
+                $dataType = $rule['dataType'] ?? 'json';
+                $verData = $this->getRequestData($dataType);
                 break;
             case 'field':
                 $verData = $proceedingJoinPoint->arguments['keys'][$rule['field']] ?? null;
@@ -175,11 +177,57 @@ class ValidationAspect extends AbstractAspect
     /**
      * 获取请求数据
      */
-    private function getRequestData(): array
+    private function getRequestData(string $dataType = 'json'): array
     {
         $request = $this->getRequest();
         $queryParams = $request->getQueryParams();
-        $bodyParams = $request->getParsedBody() ?: [];
+        
+        // 根据 dataType 获取不同的请求体数据
+        switch (strtolower($dataType)) {
+            case 'xml':
+                // XML 格式：从原始请求体中解析
+                $bodyContent = $request->getBody()->getContents();
+                if (!empty($bodyContent)) {
+                    // 简单的 XML 解析（实际项目中建议使用专门的 XML 解析库）
+                    libxml_use_internal_errors(true);
+                    $xml = simplexml_load_string($bodyContent);
+                    if ($xml !== false) {
+                        $bodyParams = json_decode(json_encode($xml), true) ?: [];
+                    } else {
+                        $bodyParams = [];
+                    }
+                } else {
+                    $bodyParams = [];
+                }
+                break;
+                
+            case 'form':
+                // Form 表单格式：从 POST 数据获取
+                $bodyParams = $request->getParsedBody() ?: [];
+                // 如果 parsedBody 为空，尝试从 getBody 解析
+                if (empty($bodyParams)) {
+                    parse_str($request->getBody()->getContents(), $bodyParams);
+                    $bodyParams = $bodyParams ?: [];
+                }
+                break;
+                
+            case 'json':
+            default:
+                // JSON 格式（默认）
+                $bodyParams = $request->getParsedBody() ?: [];
+                // 如果 parsedBody 为空，尝试从 getBody 解析 JSON
+                if (empty($bodyParams)) {
+                    $bodyContent = $request->getBody()->getContents();
+                    if (!empty($bodyContent)) {
+                        $decoded = json_decode($bodyContent, true);
+                        if (json_last_error() === JSON_ERROR_NONE) {
+                            $bodyParams = $decoded;
+                        }
+                    }
+                }
+                break;
+        }
+        
         return array_merge($queryParams, $bodyParams);
     }
 

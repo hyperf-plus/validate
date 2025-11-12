@@ -850,52 +850,92 @@ class Validate
      * 验证是否大于等于某个值
      * @access public
      * @param mixed $value 字段值
-     * @param mixed $rule 验证规则
+     * @param mixed $rule 验证规则（可以是数值或字段名）
      * @param array $data 数据
      * @return bool
      */
     public function egt($value, $rule, $data = [])
     {
-        return $value >= $this->getDataValue($data, $rule);
+        // 如果 $rule 是数值字符串或数值，直接使用；否则从数据中获取字段值
+        if (is_numeric($rule)) {
+            $compareValue = is_string($rule) && strpos($rule, '.') !== false ? (float)$rule : (int)$rule;
+        } else {
+            $compareValue = $this->getDataValue($data, $rule);
+            // 如果字段不存在，返回 false
+            if ($compareValue === null) {
+                return false;
+            }
+        }
+        return $value >= $compareValue;
     }
 
     /**
      * 验证是否大于某个值
      * @access public
      * @param mixed $value 字段值
-     * @param mixed $rule 验证规则
+     * @param mixed $rule 验证规则（可以是数值或字段名）
      * @param array $data 数据
      * @return bool
      */
-    public function gt($value, $rule, $data)
+    public function gt($value, $rule, $data = [])
     {
-        return $value > $this->getDataValue($data, $rule);
+        // 如果 $rule 是数值字符串或数值，直接使用；否则从数据中获取字段值
+        if (is_numeric($rule)) {
+            $compareValue = is_string($rule) && strpos($rule, '.') !== false ? (float)$rule : (int)$rule;
+        } else {
+            $compareValue = $this->getDataValue($data, $rule);
+            // 如果字段不存在，返回 false
+            if ($compareValue === null) {
+                return false;
+            }
+        }
+        return $value > $compareValue;
     }
 
     /**
      * 验证是否小于等于某个值
      * @access public
      * @param mixed $value 字段值
-     * @param mixed $rule 验证规则
+     * @param mixed $rule 验证规则（可以是数值或字段名）
      * @param array $data 数据
      * @return bool
      */
     public function elt($value, $rule, $data = [])
     {
-        return $value <= $this->getDataValue($data, $rule);
+        // 如果 $rule 是数值字符串或数值，直接使用；否则从数据中获取字段值
+        if (is_numeric($rule)) {
+            $compareValue = is_string($rule) && strpos($rule, '.') !== false ? (float)$rule : (int)$rule;
+        } else {
+            $compareValue = $this->getDataValue($data, $rule);
+            // 如果字段不存在，返回 false
+            if ($compareValue === null) {
+                return false;
+            }
+        }
+        return $value <= $compareValue;
     }
 
     /**
      * 验证是否小于某个值
      * @access public
      * @param mixed $value 字段值
-     * @param mixed $rule 验证规则
+     * @param mixed $rule 验证规则（可以是数值或字段名）
      * @param array $data 数据
      * @return bool
      */
     public function lt($value, $rule, $data = [])
     {
-        return $value < $this->getDataValue($data, $rule);
+        // 如果 $rule 是数值字符串或数值，直接使用；否则从数据中获取字段值
+        if (is_numeric($rule)) {
+            $compareValue = is_string($rule) && strpos($rule, '.') !== false ? (float)$rule : (int)$rule;
+        } else {
+            $compareValue = $this->getDataValue($data, $rule);
+            // 如果字段不存在，返回 false
+            if ($compareValue === null) {
+                return false;
+            }
+        }
+        return $value < $compareValue;
     }
 
     /**
@@ -1227,9 +1267,14 @@ class Validate
             $param = null;
         }
 
-       // 检查 $param 是否为空，如果为空，则设置为一个空数组
+        // 检查 $param 是否为空，如果为空，则设置为默认标志 0
         if ($param === null) {
-            $param = [];
+            $param = 0;
+        }
+
+        // 确保 $param 是整数（filter_var 的第三个参数应该是整数标志）
+        if (!is_int($param)) {
+            $param = (int)$param;
         }
 
         return false !== filter_var($value, is_int($rule) ? $rule : filter_id($rule), $param);

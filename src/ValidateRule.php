@@ -1,11 +1,9 @@
 <?php
 namespace HPlus\Validate;
 
-namespace HPlus\Validate;
-
 /**
  * Class ValidateRule
- * @package think\validate
+ * @package HPlus\Validate
  * @method ValidateRule confirm(mixed $field, string $msg = '') static 验证是否和某个字段的值一致
  * @method ValidateRule different(mixed $field, string $msg = '') static 验证是否和某个字段的值是否不同
  * @method ValidateRule egt(mixed $value, string $msg = '') static 验证是否大于等于某个值
