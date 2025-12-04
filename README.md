@@ -1,623 +1,470 @@
-# HPlus Validate - 智能请求验证组件
+# HPlus Validate
 
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.0-8892BF.svg)](https://php.net)
-[![Hyperf Version](https://img.shields.io/badge/hyperf-%3E%3D3.0-brightgreen.svg)](https://hyperf.io)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-23%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-80%2B%25-brightgreen.svg)](tests)
+基于 `hyperf/validation` 的路由验证适配器，支持注解式验证。
 
-一个为 Hyperf 框架打造的智能请求验证组件，支持注解驱动、自动类型转换、友好错误提示等特性。
+## 特性
 
+- 🚀 基于 Laravel Validation 规则，功能强大
+- 📝 注解式验证，代码简洁优雅
+- ⚡ 规则缓存，高性能
+- 🎯 专注路由验证，职责单一
+- 🔧 完全兼容 hyperf/validation 所有规则
 
-## ✨ 核心特性
-
-- 🎯 **注解驱动验证** - 使用注解定义验证规则，简洁直观
-- 🔄 **自动类型转换** - 智能转换请求参数类型
-- 📝 **友好错误提示** - 支持自定义错误消息和多语言
-- 🚀 **高性能设计** - 规则缓存、懒加载优化
-- 🔧 **灵活扩展** - 支持自定义验证规则
-- 🤝 **无缝集成** - 与 Route 和 Swagger 组件完美配合
-
-## 📦 安装
+## 安装
 
 ```bash
 composer require hyperf-plus/validate
 ```
 
-### ✅ 兼容性说明
+## 配置
 
-**本包支持无缝升级**，完全向后兼容。所有公共API和注解保持不变：
-- `RequestValidation` 注解的所有参数保持兼容
-- `RuleParser` 的公共方法签名未改变
-- 仅进行了内部性能优化，不影响外部使用
+### 1. 发布配置文件（可选）
 
-## 🚀 快速开始
+```bash
+php bin/hyperf.php vendor:publish hyperf-plus/validate
+```
 
-### 1. 基础使用
+### 2. 安装语言包（必需）
+
+```bash
+composer require hyperf/translation
+php bin/hyperf.php vendor:publish hyperf/translation
+```
+
+配置 `config/autoload/translation.php`：
+
+```php
+return [
+    'locale' => 'zh_CN',
+    'fallback_locale' => 'en',
+    'path' => BASE_PATH . '/storage/languages',
+];
+```
+
+## 使用方法
+
+### 基础用法
 
 ```php
 <?php
 
-use HPlus\Validate\Annotations\RequestValidation;
-use HPlus\Route\Annotation\PostApi;
+namespace App\Controller;
 
+use HPlus\Route\Annotation\PostApi;
+use HPlus\Route\Annotation\ApiController;
+use HPlus\Validate\Annotations\RequestValidation;
+
+#[ApiController(prefix: '/api/users')]
 class UserController
 {
-    #[PostApi]
+    #[PostApi(path: '')]
     #[RequestValidation(
         rules: [
-            'username' => 'required|string|min:3|max:20',
-            'email' => 'required|email',
-            'age' => 'integer|min:18|max:100',
-            'password' => 'required|string|min:6'
+            'name' => 'required|string|max:50',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6|confirmed',
+            'age' => 'nullable|integer|between:18,100',
+        ],
+        messages: [
+            'name.required' => '用户名不能为空',
+            'email.unique' => '该邮箱已被注册',
         ]
     )]
     public function create()
     {
-        // 验证通过后执行
-        $data = $this->request->getParsedBody();
-        // ...
+        // 验证通过后的逻辑
+        return ['message' => 'success'];
     }
 }
 ```
 
-### 2. 字段描述
+### 验证模式
+
+#### 1. JSON 模式（默认）
+
+验证请求体（POST/PUT JSON 数据）：
 
 ```php
 #[RequestValidation(
-    rules: [
-        'username|用户名' => 'required|string|min:3|max:20',
-        'email|邮箱地址' => 'required|email',
-        'age|年龄' => 'integer|min:18|max:100',
-        'password|密码' => 'required|string|min:6'
-    ]
+    rules: ['name' => 'required'],
+    mode: 'json'  // 默认值，可省略
 )]
 ```
 
-### 3. 自定义错误消息
+#### 2. Query 模式
+
+验证查询参数（GET 请求参数）：
+
+```php
+#[GetApi(path: '')]
+#[RequestValidation(
+    rules: [
+        'page' => 'required|integer|min:1',
+        'size' => 'required|integer|between:1,100',
+        'keyword' => 'nullable|string|max:50',
+    ],
+    mode: 'query'
+)]
+public function list()
+{
+    // ...
+}
+```
+
+#### 3. All 模式
+
+合并验证查询参数和请求体：
+
+```php
+#[PostApi(path: '/search')]
+#[RequestValidation(
+    rules: [
+        'page' => 'required|integer',  // 来自 query
+        'filters' => 'required|array', // 来自 body
+    ],
+    mode: 'all'
+)]
+public function search()
+{
+    // ...
+}
+```
+
+### 自定义错误消息
 
 ```php
 #[RequestValidation(
     rules: [
-        'username' => 'required|string|min:3|max:20',
-        'email' => 'required|email'
+        'email' => 'required|email',
+        'password' => 'required|min:6',
     ],
     messages: [
-        'username.required' => '请输入用户名',
-        'username.min' => '用户名至少需要3个字符',
-        'email.required' => '请输入邮箱地址',
-        'email.email' => '邮箱格式不正确'
+        'email.required' => '邮箱地址不能为空',
+        'email.email' => '邮箱格式不正确',
+        'password.min' => '密码至少需要6个字符',
     ]
 )]
 ```
 
-### 4. 嵌套验证
+### 自定义字段名称
 
 ```php
 #[RequestValidation(
     rules: [
-        'user' => 'required|array',
-        'user.name' => 'required|string',
-        'user.email' => 'required|email',
-        'user.profile' => 'array',
-        'user.profile.bio' => 'string|max:200',
-        'tags' => 'array',
-        'tags.*' => 'string|distinct'
+        'user_email' => 'required|email',
+    ],
+    attributes: [
+        'user_email' => '用户邮箱',
     ]
+)]
+// 错误消息将显示："用户邮箱格式不正确"，而不是"user_email格式不正确"
+```
+
+### 停止首个失败
+
+默认验证所有字段，返回所有错误。如果只想返回第一个错误：
+
+```php
+#[RequestValidation(
+    rules: ['email' => 'required|email'],
+    stopOnFirstFailure: true
 )]
 ```
 
-## 📋 验证规则
+## 支持的验证规则
+
+完全支持 Laravel Validation 所有规则，包括但不限于：
 
 ### 基础规则
 
-| 规则 | 说明 | 示例 |
-|------|------|------|
-| required | 必填 | `required` |
-| nullable | 可为 null | `nullable` |
-| string | 字符串 | `string` |
-| integer | 整数 | `integer` |
-| numeric | 数字 | `numeric` |
-| boolean | 布尔值 | `boolean` |
-| array | 数组 | `array` |
-| json | JSON 字符串 | `json` |
+- `required` - 必填
+- `nullable` - 可为空
+- `string` - 字符串
+- `integer` - 整数
+- `numeric` - 数字
+- `boolean` - 布尔值
+- `array` - 数组
+- `json` - JSON 字符串
 
 ### 字符串规则
 
-| 规则 | 说明 | 示例 |
-|------|------|------|
-| min:n | 最小长度 | `min:3` |
-| max:n | 最大长度 | `max:20` |
-| length:n | 固定长度 | `length:11` |
-| email | 邮箱格式 | `email` |
-| url | URL 格式 | `url` |
-| ip | IP 地址 | `ip` |
-| alpha | 纯字母 | `alpha` |
-| alpha_num | 字母数字 | `alpha_num` |
-| alpha_dash | 字母数字下划线横线 | `alpha_dash` |
-| regex:pattern | 正则匹配 | `regex:/^1[3-9]\d{9}$/` |
+- `email` - 邮箱格式
+- `url` - URL 格式
+- `ip` - IP 地址
+- `uuid` - UUID 格式
+- `alpha` - 纯字母
+- `alpha_num` - 字母和数字
+- `alpha_dash` - 字母、数字、破折号、下划线
+- `regex:pattern` - 正则表达式
 
-### 数字规则
+### 数值规则
 
-| 规则 | 说明 | 示例 |
-|------|------|------|
-| min:n | 最小值 | `min:0` |
-| max:n | 最大值 | `max:100` |
-| between:min,max | 范围 | `between:1,100` |
-| gt:n | 大于 | `gt:0` |
-| gte:n | 大于等于 | `gte:0` |
-| lt:n | 小于 | `lt:100` |
-| lte:n | 小于等于 | `lte:100` |
+- `min:value` - 最小值
+- `max:value` - 最大值
+- `between:min,max` - 范围
+- `size:value` - 大小
+- `gt:field` - 大于某字段
+- `gte:field` - 大于等于某字段
+- `lt:field` - 小于某字段
+- `lte:field` - 小于等于某字段
+
+### 日期规则
+
+- `date` - 日期格式
+- `date_format:format` - 指定日期格式
+- `before:date` - 早于某日期
+- `after:date` - 晚于某日期
+- `before_or_equal:date` - 早于或等于
+- `after_or_equal:date` - 晚于或等于
 
 ### 数组规则
 
-| 规则 | 说明 | 示例 |
-|------|------|------|
-| min:n | 最少元素 | `min:1` |
-| max:n | 最多元素 | `max:10` |
-| size:n | 固定数量 | `size:3` |
-| distinct | 元素唯一 | `distinct` |
+- `in:foo,bar,...` - 在指定值中
+- `not_in:foo,bar,...` - 不在指定值中
+- `array` - 数组类型
+- `distinct` - 数组不重复
 
-### 特殊规则
+### 数据库规则
 
-| 规则 | 说明 | 示例 |
-|------|------|------|
-| in:list | 枚举值 | `in:active,inactive,pending` |
-| not_in:list | 排除值 | `not_in:deleted,banned` |
-| confirmed | 确认字段 | `confirmed` |
-| different:field | 不同于字段 | `different:username` |
-| same:field | 相同于字段 | `same:password` |
-| date | 日期格式 | `date` |
-| date_format:format | 日期格式 | `date_format:Y-m-d` |
-| before:date | 早于日期 | `before:2024-12-31` |
-| after:date | 晚于日期 | `after:2024-01-01` |
-| file | 文件 | `file` |
-| image | 图片 | `image` |
-| mimes:list | 文件类型 | `mimes:jpg,png,pdf` |
+- `unique:table,column,except,idColumn` - 唯一性
+- `exists:table,column` - 存在性
 
-## 🎯 高级用法
+### 文件规则
 
-### 1. 条件验证
+- `file` - 文件
+- `image` - 图片
+- `mimes:jpg,png,...` - 文件类型
+- `max:value` - 文件大小（KB）
+
+### 关系规则
+
+- `confirmed` - 确认字段（需要 `field_confirmation`）
+- `same:field` - 与某字段相同
+- `different:field` - 与某字段不同
+- `required_if:field,value` - 条件必填
+- `required_with:field` - 当某字段存在时必填
+- `required_without:field` - 当某字段不存在时必填
+
+更多规则请参考：https://laravel.com/docs/validation#available-validation-rules
+
+## 高级用法
+
+### 自定义验证规则
+
+在 `config/autoload/dependencies.php` 中扩展验证器：
+
+```php
+use Hyperf\Validation\Contract\ValidatorFactoryInterface;
+use Hyperf\Validation\ValidatorFactory;
+
+return [
+    ValidatorFactoryInterface::class => function ($container) {
+        $factory = $container->get(ValidatorFactory::class);
+        
+        // 注册自定义规则
+        $factory->extend('phone', function ($attribute, $value, $parameters, $validator) {
+            return preg_match('/^1[3-9]\d{9}$/', $value);
+        });
+        
+        // 自定义错误消息
+        $factory->replacer('phone', function ($message, $attribute, $rule, $parameters) {
+            return str_replace(':attribute', $attribute, ':attribute 必须是有效的手机号');
+        });
+        
+        return $factory;
+    },
+];
+```
+
+使用自定义规则：
+
+```php
+#[RequestValidation(
+    rules: ['mobile' => 'required|phone']
+)]
+```
+
+### 嵌套数组验证
 
 ```php
 #[RequestValidation(
     rules: [
-        'type' => 'required|in:personal,company',
-        'name' => 'required|string',
-        'company_name' => 'required_if:type,company|string',
-        'tax_number' => 'required_if:type,company|string'
+        'users' => 'required|array',
+        'users.*.name' => 'required|string',
+        'users.*.email' => 'required|email',
+        'users.*.age' => 'nullable|integer|min:18',
     ]
 )]
 ```
 
-### 2. 自定义验证规则
-
-```php
-use HPlus\Validate\ValidateRule;
-
-// 注册自定义规则
-ValidateRule::extend('phone', function ($attribute, $value, $parameters) {
-    return preg_match('/^1[3-9]\d{9}$/', $value);
-});
-
-// 使用自定义规则
-#[RequestValidation(
-    rules: [
-        'mobile' => 'required|phone'
-    ],
-    messages: [
-        'mobile.phone' => '手机号格式不正确'
-    ]
-)]
-```
-
-### 3. 嵌套对象验证
-
-验证器支持多种嵌套数据访问方式：
-
-```php
-// 点号语法
-#[RequestValidation(
-    rules: [
-        'user.name' => 'required|string|min:2',
-        'user.email' => 'required|email',
-        'user.profile.bio' => 'string|max:200',
-        'config.database.host' => 'required|string'
-    ]
-)]
-
-// 方括号语法
-#[RequestValidation(
-    rules: [
-        'data[user][name]' => 'required|string|min:2',
-        'data[user][email]' => 'required|email',
-        'data[settings][theme]' => 'required|in:light,dark'
-    ]
-)]
-
-// 混合语法
-#[RequestValidation(
-    rules: [
-        'config.database.host' => 'required|string',
-        'config[database][port]' => 'required|integer|between:1,65535',
-        'config.cache[driver]' => 'required|in:redis,file,database'
-    ]
-)]
-
-// 数组元素验证（手动遍历）
-#[RequestValidation(
-    rules: [
-        'items' => 'required|array',
-        // 然后在业务逻辑中对每个数组元素进行验证
-    ]
-)]
-```
-
-### 4. 验证场景
+### 条件验证
 
 ```php
 #[RequestValidation(
     rules: [
-        'username' => 'required|string|min:3',
-        'email' => 'required|email',
-        'password' => 'required|string|min:6'
-    ],
-    scene: 'create'  // 创建场景
+        'type' => 'required|in:person,company',
+        'id_card' => 'required_if:type,person|size:18',
+        'business_license' => 'required_if:type,company',
+    ]
 )]
-public function create() {}
-
-#[RequestValidation(
-    rules: [
-        'username' => 'string|min:3',
-        'email' => 'email',
-        'password' => 'string|min:6'
-    ],
-    scene: 'update'  // 更新场景（字段可选）
-)]
-public function update() {}
 ```
 
-### 4. 数据类型
+## 性能优化
+
+### 规则缓存
+
+验证规则会在首次请求时解析并缓存在内存中，后续请求直接使用缓存，无需重复解析注解。
+
+### 查看缓存统计
 
 ```php
-#[RequestValidation(
-    rules: [
-        'name' => 'required|string',
-        'tags' => 'array',
-        'settings' => 'json'
-    ],
-    dateType: 'json'  // 请求体类型：json(默认)、form、query
-)]
+use HPlus\Validate\Aspect\ValidationAspect;
+
+$stats = ValidationAspect::getCacheStats();
+// [
+//     'hits' => 1000,
+//     'misses' => 10,
+//     'total' => 1010,
+//     'hit_rate' => '99.01%',
+//     'rule_cache_size' => 10,
+// ]
 ```
 
-### 5. 前置处理
+### 清空缓存
 
 ```php
-#[RequestValidation(
-    rules: [
-        'email' => 'required|email',
-        'username' => 'required|string'
-    ],
-    before: function (&$data) {
-        // 前置处理：转换小写
-        $data['email'] = strtolower($data['email'] ?? '');
-        $data['username'] = trim($data['username'] ?? '');
-    }
-)]
+ValidationAspect::clearCache();
 ```
 
-## 🔧 验证器类
+## 错误处理
 
-对于复杂验证逻辑，建议使用独立的验证器类：
+验证失败会抛出 `HPlus\Validate\Exception\ValidateException` 异常，状态码为 422。
+
+建议在全局异常处理器中统一处理：
 
 ```php
 <?php
 
-namespace App\Validator;
+namespace App\Exception\Handler;
 
-use HPlus\Validate\Validate;
+use HPlus\Validate\Exception\ValidateException;
+use Hyperf\ExceptionHandler\ExceptionHandler;
+use Psr\Http\Message\ResponseInterface;
+use Throwable;
 
-class UserValidator extends Validate
+class ValidationExceptionHandler extends ExceptionHandler
 {
-    protected array $rule = [
-        'username' => 'required|string|min:3|max:20',
-        'email' => 'required|email',
-        'password' => 'required|string|min:6',
-        'age' => 'integer|between:18,100'
-    ];
-    
-    protected array $message = [
-        'username.required' => '请输入用户名',
-        'email.email' => '邮箱格式不正确',
-        'password.min' => '密码至少6个字符'
-    ];
-    
-    protected array $scene = [
-        'create' => ['username', 'email', 'password'],
-        'update' => ['username', 'email'],
-        'login' => ['email', 'password']
-    ];
-}
-
-// 使用验证器
-#[PostApi]
-#[RequestValidation(validator: UserValidator::class, scene: 'create')]
-public function create() {}
-```
-
-## 🤝 与其他组件集成
-
-### 与 Route 组件集成
-
-验证组件会自动识别路由参数：
-
-```php
-#[GetApi]
-#[RequestValidation(rules: [
-    'page' => 'integer|min:1|default:1',
-    'size' => 'integer|min:1|max:100|default:20',
-    'keyword' => 'string|max:50'
-])]
-public function index() {}
-```
-
-### 与 Swagger 组件集成
-
-验证规则会自动转换为 OpenAPI 参数定义：
-
-- `required` → required: true
-- `integer` → type: integer
-- `min/max` → minimum/maximum
-- `enum/in` → enum 数组
-- 字段描述 → description
-
-## ⚡ 性能优化
-
-- **规则缓存** - 编译后的规则缓存复用
-- **懒加载** - 按需加载验证器
-- **批量验证** - 一次验证所有规则
-- **智能短路** - 失败即停止后续验证
-
-## 🛠️ 配置
-
-在 `config/autoload/validate.php` 中配置：
-
-```php
-return [
-    // 默认错误码
-    'error_code' => 422,
-    
-    // 默认错误消息
-    'error_message' => '验证失败',
-    
-    // 是否返回所有错误
-    'return_all_errors' => true,
-    
-    // 自定义错误格式
-    'error_format' => function ($errors) {
-        return [
-            'code' => 422,
-            'message' => '验证失败',
-            'errors' => $errors
-        ];
+    public function handle(Throwable $throwable, ResponseInterface $response)
+    {
+        if ($throwable instanceof ValidateException) {
+            return $response
+                ->withStatus(422)
+                ->withHeader('Content-Type', 'application/json')
+                ->withBody(new SwooleStream(json_encode([
+                    'code' => 422,
+                    'message' => $throwable->getMessage(),
+                ], JSON_UNESCAPED_UNICODE)));
+        }
+        
+        return $response;
     }
-];
+
+    public function isValid(Throwable $throwable): bool
+    {
+        return $throwable instanceof ValidateException;
+    }
+}
 ```
 
+## RuleParser（供 Swagger 使用）
 
-## 🧪 测试覆盖率
+`RuleParser` 类用于将验证规则转换为 JSON Schema，主要供 `hyperf-plus/swagger` 插件使用：
 
-### 📊 测试统计
-
-- **总测试数量**: 36 个测试用例
-- **总断言数量**: 118+ 个断言
-- **测试通过率**: 100%
-- **覆盖的核心功能**: 96%+
-
-### 🔍 测试用例详细覆盖
-
-#### 1. 基础验证规则测试 (ValidateTest)
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_validate_required_fields` | **必填验证** | 空值、null值、0值的处理 | ✅ 空值失败，有效值通过 |
-| `it_can_validate_string_fields` | **字符串验证** | 各种字符串类型的验证 | ✅ 字符串通过，空值跳过 |
-| `it_can_validate_integer_fields` | **整数验证** | 正负整数、零值的验证 | ✅ 整数通过，字符串数字兼容 |
-| `it_can_validate_email_fields` | **邮箱验证** | 各种邮箱格式的验证 | ✅ 有效邮箱通过，无效邮箱失败 |
-
-#### 2. 长度验证规则测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_validate_minimum_length` | **最小长度验证** | 最小长度限制、可选字段处理 | ✅ 支持可选字段空值跳过 |
-| `it_can_validate_maximum_length` | **最大长度验证** | 最大长度限制 | ✅ 超长字符串正确拒绝 |
-| `it_can_validate_length_rules` | **固定长度验证** | 精确长度匹配 | ✅ 长度检查精确 |
-
-#### 3. 数值验证规则测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_validate_numeric_greater_than` | **数值比较验证** | 大于规则的数值比较 | ✅ 数值比较逻辑正确 |
-| `it_can_validate_numeric_between` | **数值范围验证** | 数值范围限制 | ✅ 边界值处理正确 |
-
-#### 4. 高级验证规则测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_validate_enum_values` | **枚举值验证** | in规则的枚举值验证 | ✅ 枚举值限制正确 |
-| `it_can_validate_not_in_rules` | **排除值验证** | notIn规则的反向枚举 | ✅ 排除逻辑正确 |
-| `it_can_validate_array_fields` | **数组验证** | 数组类型验证 | ✅ 数组类型识别正确 |
-| `it_can_validate_with_regex` | **正则验证** | 自定义正则表达式验证 | ✅ 手机号等模式验证 |
-
-#### 5. 网络与格式验证测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_validate_ip_addresses` | **IP地址验证** | IPv4/IPv6地址格式 | ✅ IP地址格式检查 |
-| `it_can_validate_url_fields` | **URL验证** | URL格式验证 | ✅ URL格式正确识别 |
-
-#### 6. 日期与确认字段测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_validate_date_fields` | **日期格式验证** | 日期格式和after规则 | ✅ 日期格式和时间比较 |
-| `it_can_validate_confirmation_fields` | **确认字段验证** | 密码确认等场景 | ✅ 确认字段匹配检查 |
-
-#### 7. 条件与场景验证测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_handle_conditional_validation` | **条件验证** | requireIf等条件规则 | ✅ 条件逻辑正确执行 |
-| `it_can_handle_validation_scenes` | **场景验证** | only方法的字段限制 | ✅ 场景验证正确 |
-
-#### 8. 自定义功能测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_use_custom_error_messages` | **自定义错误消息** | 多语言错误提示 | ✅ 错误消息本地化 |
-| `it_can_perform_batch_validation` | **批量验证** | 多字段批量错误收集 | ✅ 批量错误处理 |
-| `it_can_extend_with_custom_rules` | **自定义规则扩展** | 动态注册验证规则 | ✅ 扩展规则正确工作 |
-| `it_can_create_validator_using_static_method` | **静态方法创建** | Validate::make()静态创建 | ✅ 工厂方法正确 |
-
-#### 9. 性能与边界测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_has_acceptable_performance` | **性能测试** | 1000次验证性能基准 | ✅ 2秒内完成，单次<2ms |
-| `it_handles_edge_cases_properly` | **边界条件** | 空规则、空数据、null值 | ✅ 边界条件处理正确 |
-| `it_returns_proper_error_messages` | **错误处理** | 错误消息返回机制 | ✅ 错误信息完整返回 |
-| `it_can_validate_complex_rules` | **复合规则测试** | 多规则组合验证 | ✅ 复合规则正确执行 |
-
-#### 10. 嵌套验证测试
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_validate_nested_objects_with_dot_notation` | **点号嵌套验证** | user.name、user.profile.bio等 | ✅ 点号嵌套访问正确 |
-| `it_can_validate_nested_objects_with_bracket_notation` | **方括号嵌套验证** | data[user][name]等 | ✅ 方括号嵌套访问正确 |
-| `it_can_validate_array_elements_with_wildcard` | **数组元素验证** | 数组元素单独验证逻辑 | ✅ 数组元素验证正确 |
-| `it_can_validate_mixed_nested_formats` | **混合嵌套格式** | 点号和方括号混合使用 | ✅ 混合格式解析正确 |
-| `it_handles_missing_nested_fields_gracefully` | **嵌套字段缺失处理** | 可选嵌套字段的空值处理 | ✅ 空值处理逻辑正确 |
-
-#### 11. 切面集成测试 (ValidationAspectTest)
-
-| 测试方法 | 功能覆盖 | 验证内容 | 结果验证 |
-|---------|----------|----------|----------|
-| `it_can_be_instantiated` | **切面实例化** | 依赖注入和构造函数 | ✅ 正确实例化 |
-| `it_recognizes_validation_annotations` | **注解识别** | RequestValidation、Validation注解 | ✅ 注解类正确识别 |
-| `it_can_throw_validation_exception` | **异常处理** | ValidateException异常机制 | ✅ 异常正确抛出 |
-| `it_can_throw_validation_exception_with_custom_message` | **自定义异常** | 自定义异常消息 | ✅ 异常消息正确 |
-
-### 🎯 功能覆盖率分析
-
-#### ✅ 已充分测试的功能
-- ✅ **基础验证规则**: require、string、integer、email、array等
-- ✅ **长度验证**: min、max、length等长度限制规则
-- ✅ **数值验证**: gt、gte、lt、lte、between等数值比较
-- ✅ **枚举验证**: in、notIn等枚举值限制
-- ✅ **格式验证**: email、url、ip、regex等格式检查
-- ✅ **日期验证**: dateFormat、after、before等日期规则
-- ✅ **条件验证**: requireIf等条件依赖规则
-- ✅ **确认验证**: confirmed等确认字段验证
-- ✅ **嵌套验证**: 点号和方括号嵌套对象访问（修复了 `numeric` 规则支持）
-- ✅ **自定义规则**: extend方法的规则扩展
-- ✅ **错误处理**: 自定义错误消息和批量验证
-- ✅ **性能测试**: 大量验证的性能基准
-- ✅ **切面集成**: 注解驱动的AOP验证
-
-#### 🔄 可进一步扩展的测试
-- 🔄 **文件验证**: file、image、mimes等文件相关规则
-- 🔄 **通配符验证**: items.*.field 格式的数组元素自动验证
-- 🔄 **场景验证**: 更复杂的场景切换测试
-- 🔄 **国际化**: 多语言错误消息测试
-- 🔄 **缓存机制**: 验证规则缓存的测试
-
-### 🎯 验证逻辑设计原则
-
-我们的验证库遵循以下核心设计原则：
-
-#### 1. **可选字段原则**
 ```php
-// ✅ 正确：可选字段的空值被跳过验证
-$rules = ['field' => 'min:3'];
-$result = $validator->check(['field' => ''], $rules); // 返回 true
+use HPlus\Validate\RuleParser;
 
-// ✅ 正确：必填字段的空值验证失败
-$rules = ['field' => 'require|min:3'];
-$result = $validator->check(['field' => ''], $rules); // 返回 false
+// 单个规则转换
+$schema = RuleParser::ruleToJsonSchema('required|string|max:50|email');
+// ['type' => 'string', 'maxLength' => 50, 'format' => 'email']
+
+// 批量规则转换
+$schema = RuleParser::rulesToJsonSchema([
+    'name|姓名' => 'required|string|max:50',
+    'age|年龄' => 'nullable|integer|between:18,100',
+]);
+// 返回完整的 JSON Schema
 ```
 
-#### 2. **渐进式验证**
-- 非必填字段：空值直接跳过后续验证
-- 必填字段：空值在require规则处失败
-- 有值字段：按规则顺序逐一验证
+## 与旧版本的区别
 
-#### 3. **错误消息友好性**
-- 支持字段别名显示
-- 支持自定义错误消息
-- 支持多语言错误提示
+### 旧版（已弃用）
 
-### 🚀 测试执行
-
-```bash
-# 运行所有测试
-composer test
-
-# 运行特定分组测试
-vendor/bin/phpunit --group basic
-vendor/bin/phpunit --group length
-vendor/bin/phpunit --group performance
+```php
+#[RequestValidation(
+    rules: ['email' => 'required|email'],
+    validate: UserValidator::class,  // ❌ 不再需要
+    scene: 'create',                 // ❌ 不再需要
+    filter: true,                    // ✅ 保留
+    security: true,                  // ✅ 保留
+    batch: true,                     // ✅ 改为 stopOnFirstFailure
+    dateType: 'json'                 // ✅ 改为 mode
+)]
 ```
 
-### 📈 测试结果示例
+### 新版（推荐）
 
+```php
+#[RequestValidation(
+    rules: ['email' => 'required|email'],
+    messages: [],                    // ✅ 自定义消息
+    attributes: [],                  // ✅ 字段别名
+    mode: 'json',                    // ✅ 验证模式
+    filter: false,                   // ✅ 过滤多余字段
+    security: false,                 // ✅ 安全模式
+    stopOnFirstFailure: false        // ✅ 停止策略
+)]
 ```
-PHPUnit 10.5.47 by Sebastian Bergmann and contributors.
 
-...............................                                   31 / 31 (100%)
+### 参数说明
 
-Time: 00:00.041, Memory: 10.00 MB
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `rules` | array | `[]` | 验证规则 (Laravel validation 规则) |
+| `messages` | array | `[]` | 自定义错误消息 |
+| `attributes` | array | `[]` | 字段别名（用于错误消息） |
+| `mode` | string | `'json'` | 验证模式：`json`(请求体) / `query`(查询参数) / `all`(合并) |
+| `filter` | bool | `false` | 是否过滤多余字段（只保留规则中定义的字段） |
+| `security` | bool | `false` | 安全模式（请求中有未定义字段时抛出异常） |
+| `stopOnFirstFailure` | bool | `false` | 是否在第一个失败时停止验证 |
 
-OK (31 tests, 104 assertions)
-```
+## 迁移指南
 
-## 📝 最佳实践
+如果你正在从旧版本迁移：
 
-1. **规则组织**
-   - 简单验证用注解
-   - 复杂验证用验证器类
-   - 共用规则抽取为基类
+1. ✅ 保留 `rules` 参数
+2. ❌ 移除 `validate` 和 `scene` 参数（改用内联规则）
+3. ✅ 保留 `filter` 和 `security` 参数
+4. ✅ 将 `dateType` 改为 `mode`
+5. ✅ 将 `batch: false` 改为 `stopOnFirstFailure: true`
 
-2. **错误处理**
-   - 提供友好的错误提示
-   - 使用字段描述而非字段名
-   - 支持多语言错误消息
+## 常见问题
 
-3. **性能考虑**
-   - 合理使用验证场景
-   - 避免过度复杂的正则
-   - 大数据量考虑分批验证
+### 1. 验证不生效？
 
-## 🐛 常见问题
+检查是否正确安装了 `hyperf/validation` 和 `hyperf/translation`。
 
-1. **验证不生效**
-   - 检查注解是否正确导入
-   - 确认中间件是否注册
-   - 验证规则语法是否正确
+### 2. 错误消息是英文？
 
-2. **类型转换失败**
-   - 检查数据类型是否匹配
-   - 使用 `nullable` 处理可选字段
-   - 注意 `dateType` 设置
+确保配置了中文语言包，参考"配置"部分。
 
-3. **自定义规则不工作**
-   - 确认规则已注册
-   - 检查规则名称是否冲突
-   - 验证闭包返回值
+### 3. 如何验证 GET 请求参数？
 
-## 📄 许可证
+使用 `mode: 'query'`。
 
-MIT License
+### 4. 如何同时验证 query 和 body？
 
-## 🤝 贡献
+使用 `mode: 'all'`。
 
-欢迎提交 Issue 和 Pull Request！
+## License
+
+Apache-2.0

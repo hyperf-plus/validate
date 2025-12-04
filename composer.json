@@ -7,13 +7,15 @@
     "validate",
     "hyperf"
   ],
-  "description": "hyperf-plus validate 支持request 和方法场景验证，兼容tp5写法 支持控制器注解验证、方法注解验证",
+  "description": "hyperf-plus validate 基于 hyperf/validation 的路由验证适配器，支持注解式验证",
   "license": "Apache-2.0",
   "require": {
     "php": ">=8.1",
     "hyperf/di": "^3.1.0",
     "hyperf/http-message": "^3.1.0",
-    "hyperf/utils": "^3.1.0"
+    "hyperf/utils": "^3.1.0",
+    "hyperf/validation": "^3.1.0",
+    "hyperf/translation": "^3.1.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0",

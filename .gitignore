@@ -15,3 +15,9 @@ phpunit.xml
 # System
 .DS_Store
 Thumbs.db
+
+# Coverage
+coverage/
+composer.lock
+build/
+.phpunit.result.cache

@@ -73,10 +73,7 @@ class RuleParser
         'regex' => null, // 使用pattern代替
     ];
 
-    /**
-     * 规则提取器策略
-     */
-    private static array $extractors = [];
+    // 注意：提取器策略模式预留，目前直接使用静态方法实现
 
     /**
      * 初始化预编译正则表达式
@@ -99,20 +96,6 @@ class RuleParser
         }
     }
 
-    /**
-     * 初始化规则提取器
-     */
-    private static function initExtractors(): void
-    {
-        if (empty(self::$extractors)) {
-            self::$extractors = [
-                'type' => new TypeExtractor(),
-                'format' => new FormatExtractor(),
-                'constraint' => new ConstraintExtractor(),
-                'validation' => new ValidationExtractor(),
-            ];
-        }
-    }
 
     /**
      * 解析字段名和描述（性能优化版本）
@@ -370,8 +353,11 @@ class RuleParser
      */
     private static function generateCacheKey(array $rules): string
     {
-        // 使用更高效的哈希算法
-        return hash('xxh3', serialize($rules));
+        $data = serialize($rules);
+        // xxh3 更快但可能不可用，md5 作为回退
+        return in_array('xxh3', hash_algos(), true) 
+            ? hash('xxh3', $data) 
+            : md5($data);
     }
 
     /**
@@ -552,7 +538,6 @@ class RuleParser
     public static function warmupCache(array $commonRules = []): void
     {
         self::initRegex();
-        self::initExtractors();
         
         if (empty($commonRules)) {
             $commonRules = [
@@ -598,53 +583,5 @@ class RuleParser
         if (function_exists('gc_collect_cycles')) {
             gc_collect_cycles();
         }
-    }
-}
-
-/**
- * 类型提取器（策略模式）
- */
-class TypeExtractor
-{
-    public function extract(string $rule): ?string
-    {
-        // 类型提取逻辑
-        return null;
-    }
-}
-
-/**
- * 格式提取器（策略模式）
- */
-class FormatExtractor
-{
-    public function extract(string $rule): ?string
-    {
-        // 格式提取逻辑
-        return null;
-    }
-}
-
-/**
- * 约束提取器（策略模式）
- */
-class ConstraintExtractor
-{
-    public function extract(string $rule): array
-    {
-        // 约束提取逻辑
-        return [];
-    }
-}
-
-/**
- * 验证提取器（策略模式）
- */
-class ValidationExtractor
-{
-    public function extract(string $rule): array
-    {
-        // 验证规则提取逻辑
-        return [];
     }
 } 
