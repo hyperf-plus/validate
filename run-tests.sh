@@ -1,5 +1,6 @@
 #!/bin/bash
 
+<<<<<<< HEAD
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -87,3 +88,26 @@ else
     echo -e "${RED}✗ 测试失败${NC}"
     exit 1
 fi
+=======
+echo "==================================="
+echo "Hyperf-Plus Validate 测试套件"
+echo "==================================="
+echo
+
+echo "正在安装测试依赖..."
+composer install --dev
+
+echo
+echo "运行单元测试..."
+echo "==================================="
+./vendor/bin/phpunit -c phpunit.xml --colors=always
+
+echo
+echo "生成代码覆盖率报告..."
+echo "==================================="
+./vendor/bin/phpunit -c phpunit.xml --colors=always --coverage-html tests/coverage --coverage-text
+
+echo
+echo "测试完成！"
+echo "覆盖率报告已生成在: tests/coverage/index.html" 
+>>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
