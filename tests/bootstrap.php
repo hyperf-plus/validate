@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-<<<<<<< HEAD
 /**
  * PHPUnit Bootstrap File
  */
@@ -20,10 +19,3 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 if (class_exists('Mockery')) {
     Mockery::globalHelpers();
 }
-=======
-error_reporting(E_ALL);
-
-! defined('BASE_PATH') && define('BASE_PATH', dirname(__DIR__, 1));
-
-require BASE_PATH . '/vendor/autoload.php'; 
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610

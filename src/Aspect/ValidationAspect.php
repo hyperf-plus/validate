@@ -20,33 +20,17 @@ use Psr\Http\Message\ServerRequestInterface;
 #[Aspect]
 class ValidationAspect extends AbstractAspect
 {
-<<<<<<< HEAD
     public array $annotations = [RequestValidation::class];
 
     /**
      * 注解规则缓存（常驻内存，减少反射开销）
-=======
-    /**
-     * 验证规则缓存（常驻内存）
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
      */
     private static array $ruleCache = [];
 
 
 
     /**
-<<<<<<< HEAD
      * 缓存统计
-=======
-     * 类存在性检查缓存
-     */
-    private static array $classExistsCache = [];
-
-
-
-    /**
-     * 缓存统计信息
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
      */
     private static array $cacheStats = [
         'hits' => 0,
@@ -54,24 +38,9 @@ class ValidationAspect extends AbstractAspect
         'total' => 0,
     ];
 
-<<<<<<< HEAD
     public function __construct(
         protected ContainerInterface $container,
         protected ValidatorFactoryInterface $validatorFactory
-=======
-
-
-    /**
-     * 请求对象（懒加载）
-     */
-    private ?ServerRequestInterface $request = null;
-
-    // 要切入的类，可以多个，亦可通过 :: 标识到具体的某个方法，通过 * 可以模糊匹配
-    public array $annotations = [Validation::class, RequestValidation::class];
-
-    public function __construct(
-        private ContainerInterface $container
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
     ) {
     }
 
@@ -89,18 +58,7 @@ class ValidationAspect extends AbstractAspect
         // 从缓存获取验证配置
         if (!isset(self::$ruleCache[$cacheKey])) {
             self::$cacheStats['misses']++;
-<<<<<<< HEAD
             self::$ruleCache[$cacheKey] = $this->parseValidationConfig($proceedingJoinPoint);
-=======
-            $rules = $this->parseValidationRules($proceedingJoinPoint);
-            
-            // 提前退出：如果没有验证规则，直接返回
-            if (empty($rules)) {
-                return $proceedingJoinPoint->process();
-            }
-            
-            self::$ruleCache[$cacheKey] = $rules;
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
         } else {
             self::$cacheStats['hits']++;
             $rules = self::$ruleCache[$cacheKey];
@@ -111,7 +69,6 @@ class ValidationAspect extends AbstractAspect
             }
         }
 
-<<<<<<< HEAD
         $config = self::$ruleCache[$cacheKey];
 
         // 如果没有验证规则，直接执行
@@ -121,12 +78,6 @@ class ValidationAspect extends AbstractAspect
 
         // 执行验证
         $this->validate($config);
-=======
-        // 执行验证
-        foreach ($rules as $rule) {
-            $this->executeValidation($rule, $proceedingJoinPoint);
-        }
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
 
         return $proceedingJoinPoint->process();
     }
@@ -136,11 +87,11 @@ class ValidationAspect extends AbstractAspect
      */
     private function parseValidationConfig(ProceedingJoinPoint $proceedingJoinPoint): ?array
     {
-<<<<<<< HEAD
         foreach ($proceedingJoinPoint->getAnnotationMetadata()->method as $annotation) {
             if ($annotation instanceof RequestValidation) {
                 return [
                     'rules' => $annotation->rules,
+                    'queryRules' => $annotation->queryRules,
                     'messages' => $annotation->messages,
                     'attributes' => $annotation->attributes,
                     'mode' => $annotation->mode,
@@ -148,50 +99,6 @@ class ValidationAspect extends AbstractAspect
                     'security' => $annotation->security,
                     'stopOnFirstFailure' => $annotation->stopOnFirstFailure,
                 ];
-=======
-        $annotations = $proceedingJoinPoint->getAnnotationMetadata()->method;
-        
-        // 提前退出：如果没有注解
-        if (empty($annotations)) {
-            return [];
-        }
-
-        $rules = [];
-        foreach ($annotations as $validation) {
-            switch (true) {
-                case $validation instanceof RequestValidation:
-                    // 提前退出：如果没有验证规则
-                    if (empty($validation->rules)) {
-                        continue 2;
-                    }
-                    
-                    $rules[] = [
-                        'type' => 'request',
-                        'validation' => $validation,
-                        'rules' => $validation->rules,
-                        'scene' => $validation->scene ?: $proceedingJoinPoint->methodName,
-                        'messages' => $validation->messages ?? [],
-                        'attributes' => $validation->attributes ?? [],
-                        'batch' => $validation->batch,
-                        'security' => $validation->security,
-                        'filter' => $validation->filter,
-                    ];
-                    break;
-
-                case $validation instanceof Validation:
-                    $rules[] = [
-                        'type' => 'field',
-                        'validation' => $validation,
-                        'field' => $validation->field,
-                        'rules' => $validation->rules,
-                        'scene' => $validation->scene ?: $proceedingJoinPoint->methodName,
-                        'validate' => $validation->validate,
-                        'batch' => $validation->batch,
-                        'security' => $validation->security,
-                        'filter' => $validation->filter,
-                    ];
-                    break;
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
             }
         }
 
@@ -203,207 +110,108 @@ class ValidationAspect extends AbstractAspect
      */
     private function validate(array $config): void
     {
-<<<<<<< HEAD
         $request = $this->container->get(ServerRequestInterface::class);
         
-        // 根据模式获取数据
-        $data = match ($config['mode']) {
-            'json' => $request->getParsedBody() ?: [],
-            'query' => $request->getQueryParams(),
-            'all' => array_merge(
-                $request->getQueryParams(),
-                $request->getParsedBody() ?: []
-            ),
-            default => $request->getParsedBody() ?: [],
-        };
-
-        // 获取规则中定义的字段列表
-        $allowedFields = $this->getFieldsFromRules($config['rules']);
-
-        // 安全模式：检查是否有未定义的字段
-        if ($config['security']) {
-            foreach (array_keys($data) as $key) {
-                if (!in_array($key, $allowedFields, true)) {
-                    throw new ValidateException("params {$key} invalid", 422);
-=======
-        switch ($rule['type']) {
-            case 'request':
-                $verData = $this->getRequestData();
-                break;
-            case 'field':
-                $verData = $proceedingJoinPoint->arguments['keys'][$rule['field']] ?? null;
-                break;
-            default:
-                return;
-        }
-
-        $this->validationData($rule, $verData, $proceedingJoinPoint);
-    }
-
-    /**
-     * 获取请求数据
-     */
-    private function getRequestData(): array
-    {
-        $request = $this->getRequest();
-        $queryParams = $request->getQueryParams();
-        $bodyParams = $request->getParsedBody() ?: [];
-        return array_merge($queryParams, $bodyParams);
-    }
-
-    /**
-     * 懒加载获取请求对象
-     */
-    private function getRequest(): ServerRequestInterface
-    {
-        if ($this->request === null) {
-            $this->request = $this->container->get(ServerRequestInterface::class);
-        }
-        return $this->request;
-    }
-
-    /**
-     * 验证数据（优化版）
-     */
-    private function validationData(array $rule, $verData, ProceedingJoinPoint $proceedingJoinPoint): void
-    {
-        $validation = $rule['validation'];
-        $isRequest = $rule['type'] === 'request';
-
-        // 获取验证器实例
-        $validate = $this->getValidator($rule);
-
-        $rules = $rule['rules'] ?? null;
-
-        // 处理自定义验证器类
-        if ($rules === null && isset($rule['validate'])) {
-            $class = $rule['validate'];
-            if (!$this->classExistsCached($class)) {
-                throw new ValidateException('class not exists:' . $class);
-            }
-            $rules = $validate->getSceneRule($rule['scene']);
-        }
-
-        // 设置自定义消息和属性（仅在需要时）
-        if (!empty($rule['messages'])) {
-            $validate->message($rule['messages']);
-        }
-
-        if (!empty($rule['attributes'])) {
-            $validate->setAttributes($rule['attributes']);
-        }
-
-        // 执行验证
-        if ($validate->batch($rule['batch'])->check($verData, $rules, $rule['scene']) === false) {
-            throw new ValidateException((string)$validate->getError());
-        }
-
-        // 安全检查（仅在启用时）
-        if ($rule['security']) {
-            $fields = $this->getFields($rules);
-            foreach ($verData as $key => $item) {
-                if (!in_array($key, $fields, true)) {
-                    throw new ValidateException('params ' . $key . ' invalid');
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
+        $filteredQueryData = null;
+        $filteredBodyData = null;
+        
+        // 1. 验证查询参数（如果有 queryRules）
+        if (!empty($config['queryRules'])) {
+            $queryData = $request->getQueryParams();
+            $allowedQueryFields = $this->getFieldsFromRules($config['queryRules']);
+            
+            // 安全模式：检查 query 是否有未定义的字段
+            if ($config['security']) {
+                foreach (array_keys($queryData) as $key) {
+                    if (!in_array($key, $allowedQueryFields, true)) {
+                        throw new ValidateException("query params {$key} invalid", 422);
+                    }
                 }
             }
-        }
-
-<<<<<<< HEAD
-        // 使用 hyperf/validation 进行验证
-        $validator = $this->validatorFactory->make(
-            $data,
-            $config['rules'],
-            $config['messages'],
-            $config['attributes']
-        );
-
-        // 设置是否在第一个失败时停止
-        // 注意：Hyperf 3.1 的 Validator 不支持 stopOnFirstFailure() 方法
-        // 但是可以通过配置项实现类似效果
-        if ($config['stopOnFirstFailure'] && method_exists($validator, 'stopOnFirstFailure')) {
-            $validator->stopOnFirstFailure();
-        }
-
-        // 验证失败抛出异常
-        if ($validator->fails()) {
-            $errors = $validator->errors();
             
-            // 获取第一个错误消息
-            $firstError = $errors->first();
+            // 验证 query 参数
+            $queryValidator = $this->validatorFactory->make(
+                $queryData,
+                $config['queryRules'],
+                $config['messages'],
+                $config['attributes']
+            );
             
-            throw new ValidateException($firstError, 422);
+            if ($config['stopOnFirstFailure'] && method_exists($queryValidator, 'stopOnFirstFailure')) {
+                $queryValidator->stopOnFirstFailure();
+            }
+            
+            if ($queryValidator->fails()) {
+                throw new ValidateException($queryValidator->errors()->first(), 422);
+            }
+            
+            // 记录过滤后的 query 数据
+            if ($config['filter']) {
+                $filteredQueryData = array_intersect_key($queryData, array_flip($allowedQueryFields));
+            }
         }
-
-        // 过滤模式：只保留规则中定义的字段，更新到请求上下文
-        if ($config['filter']) {
-            $filteredData = array_intersect_key($data, array_flip($allowedFields));
+        
+        // 2. 验证请求体（如果有 rules）
+        if (!empty($config['rules'])) {
+            // 根据模式获取请求体数据
+            $bodyData = match ($config['mode']) {
+                'json' => $request->getParsedBody() ?: [],
+                'form' => $this->parseFormData($request),
+                'xml' => $this->parseXmlData($request),
+                default => $request->getParsedBody() ?: [],
+            };
             
-            Context::override(ServerRequestInterface::class, function (ServerRequestInterface $request) use ($filteredData, $config) {
-                return match ($config['mode']) {
-                    'query' => $request->withQueryParams($filteredData),
-                    default => $request->withParsedBody($filteredData),
-                };
+            $allowedBodyFields = $this->getFieldsFromRules($config['rules']);
+            
+            // 安全模式：检查 body 是否有未定义的字段
+            if ($config['security']) {
+                foreach (array_keys($bodyData) as $key) {
+                    if (!in_array($key, $allowedBodyFields, true)) {
+                        throw new ValidateException("body params {$key} invalid", 422);
+                    }
+                }
+            }
+            
+            // 验证请求体
+            $bodyValidator = $this->validatorFactory->make(
+                $bodyData,
+                $config['rules'],
+                $config['messages'],
+                $config['attributes']
+            );
+            
+            if ($config['stopOnFirstFailure'] && method_exists($bodyValidator, 'stopOnFirstFailure')) {
+                $bodyValidator->stopOnFirstFailure();
+            }
+            
+            if ($bodyValidator->fails()) {
+                throw new ValidateException($bodyValidator->errors()->first(), 422);
+            }
+            
+            // 记录过滤后的 body 数据
+            if ($config['filter']) {
+                $filteredBodyData = array_intersect_key($bodyData, array_flip($allowedBodyFields));
+            }
+        }
+        
+        // 3. 过滤模式：更新请求上下文
+        if ($config['filter'] && ($filteredQueryData !== null || $filteredBodyData !== null)) {
+            Context::override(ServerRequestInterface::class, function (ServerRequestInterface $request) use ($filteredQueryData, $filteredBodyData) {
+                if ($filteredQueryData !== null) {
+                    $request = $request->withQueryParams($filteredQueryData);
+                }
+                if ($filteredBodyData !== null) {
+                    $request = $request->withParsedBody($filteredBodyData);
+                }
+                return $request;
             });
-=======
-        // 数据过滤（仅在启用时）
-        if ($rule['filter']) {
-            $fields = $this->getFields($rules);
-            $filteredData = [];
-            foreach ($verData as $key => $value) {
-                if (in_array($key, $fields, true)) {
-                    $filteredData[$key] = $value;
-                }
-            }
-
-            if ($isRequest) {
-                Context::override(ServerRequestInterface::class, function (ServerRequestInterface $request) use ($filteredData) {
-                    return $request->withParsedBody($filteredData);
-                });
-            } else {
-                $proceedingJoinPoint->arguments['keys'][$validation->field] = $filteredData;
-            }
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
         }
     }
 
     /**
-<<<<<<< HEAD
      * 从规则中提取字段名列表
      */
     private function getFieldsFromRules(array $rules): array
-=======
-     * 获取验证器实例
-     */
-    private function getValidator(array $rule): Validate
-    {
-        if (isset($rule['validate']) && $this->classExistsCached($rule['validate'])) {
-            $class = $rule['validate'];
-            return new $class();
-        }
-        
-        return new Validate();
-    }
-
-    /**
-     * 类存在性检查（带缓存）
-     */
-    private function classExistsCached(string $className): bool
-    {
-        if (isset(self::$classExistsCache[$className])) {
-            return self::$classExistsCache[$className];
-        }
-
-        $exists = class_exists($className);
-        self::$classExistsCache[$className] = $exists;
-        return $exists;
-    }
-
-    /**
-     * 获取字段列表
-     */
-    private function getFields(array $rules): array
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
     {
         $fields = [];
         foreach (array_keys($rules) as $field) {
@@ -411,24 +219,143 @@ class ValidationAspect extends AbstractAspect
             if (str_contains($field, '|')) {
                 $field = explode('|', $field)[0];
             }
-<<<<<<< HEAD
             // 处理嵌套字段 field.* 或 field.sub
             $field = explode('.', $field)[0];
             
             if (!in_array($field, $fields, true)) {
                 $fields[] = $field;
-=======
-            if (strpos($field, '|') !== false) {
-                // 字段|描述 用于指定属性名称
-                [$field] = explode('|', $field, 2);
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
             }
         }
         
         return $fields;
     }
 
+    /**
+     * 解析表单数据 (application/x-www-form-urlencoded)
+     */
+    private function parseFormData(ServerRequestInterface $request): array
+    {
+        // 优先使用 getParsedBody（框架可能已解析）
+        $data = $request->getParsedBody();
+        if (!empty($data) && is_array($data)) {
+            return $data;
+        }
+        
+        // 手动解析原始请求体
+        $body = $request->getBody();
+        $content = (string) $body;
+        
+        // 重置流位置（如果可以）
+        if ($body->isSeekable()) {
+            $body->rewind();
+        }
+        
+        if (empty($content)) {
+            return [];
+        }
+        
+        parse_str($content, $result);
+        return $result ?: [];
+    }
 
+    /**
+     * 解析 XML 数据
+     */
+    private function parseXmlData(ServerRequestInterface $request): array
+    {
+        // 检查 simplexml 扩展是否可用
+        if (!function_exists('simplexml_load_string')) {
+            throw new ValidateException(
+                'XML mode requires the simplexml PHP extension. Please install it: pecl install simplexml or enable it in php.ini',
+                422
+            );
+        }
+        
+        $body = $request->getBody();
+        $content = (string) $body;
+        
+        // 重置流位置（如果可以）
+        if ($body->isSeekable()) {
+            $body->rewind();
+        }
+        
+        if (empty($content)) {
+            return [];
+        }
+        
+        // PHP 8.0+ 默认禁用外部实体加载，此函数已弃用
+        // PHP 8.0 以下版本需要手动禁用（安全考虑）
+        $previousValue = null;
+        if (PHP_VERSION_ID < 80000 && function_exists('libxml_disable_entity_loader')) {
+            $previousValue = libxml_disable_entity_loader(true);
+        }
+        
+        if (function_exists('libxml_use_internal_errors')) {
+            libxml_use_internal_errors(true);
+        }
+        
+        try {
+            $xml = simplexml_load_string($content, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
+            
+            if ($xml === false) {
+                // XML 解析失败，返回空数组
+                return [];
+            }
+            
+            // 将 SimpleXMLElement 转换为数组
+            return $this->xmlToArray($xml);
+        } finally {
+            // 恢复原设置（仅 PHP 8.0 以下）
+            if ($previousValue !== null && function_exists('libxml_disable_entity_loader')) {
+                libxml_disable_entity_loader($previousValue);
+            }
+            if (function_exists('libxml_clear_errors')) {
+                libxml_clear_errors();
+            }
+        }
+    }
+
+    /**
+     * 将 SimpleXMLElement 转换为数组
+     */
+    private function xmlToArray(\SimpleXMLElement $xml): array
+    {
+        $result = [];
+        
+        foreach ($xml->children() as $key => $value) {
+            $children = $value->children();
+            
+            if (count($children) > 0) {
+                // 有子节点，递归处理
+                $childArray = $this->xmlToArray($value);
+                
+                // 检查是否是同名元素（数组）
+                if (isset($result[$key])) {
+                    if (!is_array($result[$key]) || !isset($result[$key][0])) {
+                        $result[$key] = [$result[$key]];
+                    }
+                    $result[$key][] = $childArray;
+                } else {
+                    $result[$key] = $childArray;
+                }
+            } else {
+                // 叶子节点
+                $val = (string) $value;
+                
+                // 检查是否是同名元素（数组）
+                if (isset($result[$key])) {
+                    if (!is_array($result[$key]) || !isset($result[$key][0])) {
+                        $result[$key] = [$result[$key]];
+                    }
+                    $result[$key][] = $val;
+                } else {
+                    $result[$key] = $val;
+                }
+            }
+        }
+        
+        return $result;
+    }
 
     /**
      * 获取缓存统计信息
@@ -443,11 +370,6 @@ class ValidationAspect extends AbstractAspect
                 ? round(self::$cacheStats['hits'] / self::$cacheStats['total'] * 100, 2) . '%'
                 : '0%',
             'rule_cache_size' => count(self::$ruleCache),
-<<<<<<< HEAD
-=======
-            'class_cache_size' => count(self::$classExistsCache),
-            'memory_usage' => round(memory_get_usage(true) / 1024 / 1024, 2) . 'MB',
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
         ];
     }
 
@@ -457,10 +379,6 @@ class ValidationAspect extends AbstractAspect
     public static function clearCache(): void
     {
         self::$ruleCache = [];
-<<<<<<< HEAD
-=======
-        self::$classExistsCache = [];
->>>>>>> 6490b4a99ecb2dc9d88003e0d659cdcb6a6dc610
         self::$cacheStats = [
             'hits' => 0,
             'misses' => 0,

@@ -103,7 +103,8 @@ abstract class TestCase extends BaseTestCase
         array $queryParams = [],
         array $bodyParams = [],
         string $method = 'POST',
-        string $contentType = 'application/json'
+        string $contentType = 'application/json',
+        ?string $rawBody = null
     ): ServerRequestInterface {
         $request = Mockery::mock(ServerRequestInterface::class);
         
@@ -125,6 +126,13 @@ abstract class TestCase extends BaseTestCase
         $uri->shouldReceive('getPath')->andReturn('/test');
         $request->shouldReceive('getUri')->andReturn($uri);
 
+        // Mock Body Stream (用于 form 和 xml 模式)
+        $body = Mockery::mock(StreamInterface::class);
+        $body->shouldReceive('__toString')->andReturn($rawBody ?? '');
+        $body->shouldReceive('isSeekable')->andReturn(true);
+        $body->shouldReceive('rewind')->andReturn(null);
+        $request->shouldReceive('getBody')->andReturn($body);
+
         return $request;
     }
 
@@ -142,11 +150,13 @@ abstract class TestCase extends BaseTestCase
     protected function createContainerWithRequest(
         array $queryParams = [],
         array $bodyParams = [],
-        string $method = 'POST'
+        string $method = 'POST',
+        string $contentType = 'application/json',
+        ?string $rawBody = null
     ): ContainerInterface {
         $container = $this->createContainer();
         
-        $request = $this->createMockRequest($queryParams, $bodyParams, $method);
+        $request = $this->createMockRequest($queryParams, $bodyParams, $method, $contentType, $rawBody);
         $this->setRequestContext($request);
         
         // 直接在容器中注册 Request 实例，而不是 Closure
