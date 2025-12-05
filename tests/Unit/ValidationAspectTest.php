@@ -158,9 +158,9 @@ class ValidationAspectTest extends TestCase
     }
 
     /**
-     * 测试 Query 模式
+     * 测试 Query 参数验证（使用 queryRules）
      */
-    public function testQueryMode(): void
+    public function testQueryRules(): void
     {
         $container = $this->createContainerWithRequest(
             ['page' => '1', 'size' => '10'],
@@ -177,11 +177,10 @@ class ValidationAspectTest extends TestCase
             'testMethod',
             [
                 new RequestValidation(
-                    rules: [
+                    queryRules: [
                         'page' => 'required|integer',
                         'size' => 'required|integer',
-                    ],
-                    mode: 'query'
+                    ]
                 )
             ]
         );
@@ -191,9 +190,9 @@ class ValidationAspectTest extends TestCase
     }
 
     /**
-     * 测试 All 模式
+     * 测试同时验证 Query 和 Body 参数
      */
-    public function testAllMode(): void
+    public function testQueryAndBodyRules(): void
     {
         $container = $this->createContainerWithRequest(
             ['query_param' => 'query_value'],
@@ -211,10 +210,11 @@ class ValidationAspectTest extends TestCase
             [
                 new RequestValidation(
                     rules: [
-                        'query_param' => 'required',
                         'body_param' => 'required',
                     ],
-                    mode: 'all'
+                    queryRules: [
+                        'query_param' => 'required',
+                    ]
                 )
             ]
         );
@@ -308,23 +308,23 @@ class ValidationAspectTest extends TestCase
 
         // 第一次调用 - cache miss
         $stats1 = ValidationAspect::getCacheStats();
-        $this->assertEquals(0, $stats1['total']);
+        $this->assertEquals(0, $stats1['total_requests']);
 
         $aspect->process($joinPoint);
 
         $stats2 = ValidationAspect::getCacheStats();
-        $this->assertEquals(1, $stats2['total']);
-        $this->assertEquals(1, $stats2['misses']);
-        $this->assertEquals(0, $stats2['hits']);
+        $this->assertEquals(1, $stats2['total_requests']);
+        $this->assertEquals(1, $stats2['rule_misses']);
+        $this->assertEquals(0, $stats2['rule_hits']);
 
         // 第二次调用 - cache hit
         $aspect->process($joinPoint);
 
         $stats3 = ValidationAspect::getCacheStats();
-        $this->assertEquals(2, $stats3['total']);
-        $this->assertEquals(1, $stats3['misses']);
-        $this->assertEquals(1, $stats3['hits']);
-        $this->assertStringContainsString('50', $stats3['hit_rate']);
+        $this->assertEquals(2, $stats3['total_requests']);
+        $this->assertEquals(1, $stats3['rule_misses']);
+        $this->assertEquals(1, $stats3['rule_hits']);
+        $this->assertStringContainsString('50', $stats3['rule_hit_rate']);
     }
 
     /**
@@ -355,14 +355,14 @@ class ValidationAspectTest extends TestCase
         $aspect->process($joinPoint);
 
         $statsBefore = ValidationAspect::getCacheStats();
-        $this->assertGreaterThan(0, $statsBefore['total']);
+        $this->assertGreaterThan(0, $statsBefore['total_requests']);
 
         ValidationAspect::clearCache();
 
         $statsAfter = ValidationAspect::getCacheStats();
-        $this->assertEquals(0, $statsAfter['total']);
-        $this->assertEquals(0, $statsAfter['hits']);
-        $this->assertEquals(0, $statsAfter['misses']);
+        $this->assertEquals(0, $statsAfter['total_requests']);
+        $this->assertEquals(0, $statsAfter['rule_hits']);
+        $this->assertEquals(0, $statsAfter['rule_misses']);
     }
 
     /**

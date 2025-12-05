@@ -57,10 +57,10 @@ class ValidationPerformanceTest extends TestCase
 
         // 验证缓存统计
         $stats = ValidationAspect::getCacheStats();
-        $this->assertEquals($iterations + 1, $stats['total']); // 预热1次 + 100次测试
-        $this->assertEquals($iterations, $stats['hits']); // 100次都是缓存命中
-        $this->assertEquals(1, $stats['misses']); // 只有预热是 miss
-        $this->assertGreaterThan(99, ($stats['hits'] / $stats['total']) * 100, '缓存命中率应大于99%');
+        $this->assertEquals($iterations + 1, $stats['total_requests']); // 预热1次 + 100次测试
+        $this->assertEquals($iterations, $stats['rule_hits']); // 100次都是缓存命中
+        $this->assertEquals(1, $stats['rule_misses']); // 只有预热是 miss
+        $this->assertGreaterThan(99, ($stats['rule_hits'] / $stats['total_requests']) * 100, '缓存命中率应大于99%');
     }
 
     /**
@@ -217,8 +217,8 @@ class ValidationPerformanceTest extends TestCase
 
         // 验证缓存统计
         $stats = ValidationAspect::getCacheStats();
-        $this->assertEquals(1000, $stats['total']);
-        $this->assertGreaterThan(90, ($stats['hits'] / $stats['total']) * 100, '缓存命中率应大于90%');
+        $this->assertEquals(1000, $stats['total_requests']);
+        $this->assertGreaterThan(90, ($stats['rule_hits'] / $stats['total_requests']) * 100, '缓存命中率应大于90%');
     }
 
     /**
@@ -262,7 +262,7 @@ class ValidationPerformanceTest extends TestCase
 
         // 验证缓存效果
         $stats = ValidationAspect::getCacheStats();
-        $hitRate = ($stats['hits'] / $stats['total']) * 100;
+        $hitRate = ($stats['rule_hits'] / $stats['total_requests']) * 100;
         $this->assertGreaterThanOrEqual(99, $hitRate, '缓存命中率应不低于99%');
     }
 

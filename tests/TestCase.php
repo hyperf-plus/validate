@@ -133,6 +133,17 @@ abstract class TestCase extends BaseTestCase
         $body->shouldReceive('rewind')->andReturn(null);
         $request->shouldReceive('getBody')->andReturn($body);
 
+        // Mock withQueryParams and withParsedBody for filter mode
+        $request->shouldReceive('withQueryParams')
+            ->andReturnUsing(function ($params) use ($request, $method, $contentType, $rawBody, $bodyParams) {
+                return $this->createMockRequest($params, $bodyParams, $method, $contentType, $rawBody);
+            });
+        
+        $request->shouldReceive('withParsedBody')
+            ->andReturnUsing(function ($params) use ($request, $queryParams, $method, $contentType, $rawBody) {
+                return $this->createMockRequest($queryParams, $params, $method, $contentType, $rawBody);
+            });
+
         return $request;
     }
 

@@ -153,13 +153,8 @@ class ValidationAspect extends AbstractAspect
         
         // 2. 验证请求体（如果有 rules）
         if (!empty($config['rules'])) {
-            // 根据模式获取请求体数据
-            $bodyData = match ($config['mode']) {
-                'json' => $request->getParsedBody() ?: [],
-                'form' => $this->parseFormData($request),
-                'xml' => $this->parseXmlData($request),
-                default => $request->getParsedBody() ?: [],
-            };
+            // 根据 mode 解析请求体数据（json/form/xml）
+            $bodyData = $this->getBodyData($request, $config['mode']);
             
             $allowedBodyFields = $this->getFieldsFromRules($config['rules']);
             
@@ -206,6 +201,19 @@ class ValidationAspect extends AbstractAspect
                 return $request;
             });
         }
+    }
+
+    /**
+     * 根据模式获取请求体数据
+     * @param string $mode 数据解析模式：json | form | xml
+     */
+    private function getBodyData(ServerRequestInterface $request, string $mode): array
+    {
+        return match ($mode) {
+            'form' => $this->parseFormData($request),
+            'xml' => $this->parseXmlData($request),
+            default => $request->getParsedBody() ?: [], // json（默认）
+        };
     }
 
     /**

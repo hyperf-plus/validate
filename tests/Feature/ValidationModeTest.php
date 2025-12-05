@@ -91,7 +91,7 @@ class ValidationModeTest extends TestCase
     }
 
     /**
-     * 测试 Query 模式 - 验证通过
+     * 测试 queryRules - 验证通过
      */
     public function testQueryModePass(): void
     {
@@ -107,12 +107,11 @@ class ValidationModeTest extends TestCase
 
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
-                rules: [
+                queryRules: [
                     'page' => 'required|integer|min:1',
                     'size' => 'required|integer|between:1,100',
                     'keyword' => 'nullable|string|max:50',
-                ],
-                mode: 'query'
+                ]
             )
         ]);
 
@@ -121,7 +120,7 @@ class ValidationModeTest extends TestCase
     }
 
     /**
-     * 测试 Query 模式 - 忽略请求体
+     * 测试 queryRules 只验证 Query - 忽略请求体
      */
     public function testQueryModeIgnoresBody(): void
     {
@@ -129,7 +128,7 @@ class ValidationModeTest extends TestCase
 
         $container = $this->createContainerWithRequest(
             [],  // query is empty
-            ['page' => '1']  // body params
+            ['page' => '1']  // body params - 不会被 queryRules 使用
         );
 
         $aspect = new ValidationAspect(
@@ -139,8 +138,7 @@ class ValidationModeTest extends TestCase
 
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
-                rules: ['page' => 'required'],
-                mode: 'query'
+                queryRules: ['page' => 'required']
             )
         ]);
 
@@ -148,7 +146,7 @@ class ValidationModeTest extends TestCase
     }
 
     /**
-     * 测试 All 模式 - 合并验证
+     * 测试同时验证 Query 和 Body 参数
      */
     public function testAllModePass(): void
     {
@@ -165,11 +163,12 @@ class ValidationModeTest extends TestCase
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
                 rules: [
-                    'page' => 'required|integer',
-                    'size' => 'required|integer',
                     'filters' => 'nullable|array',
                 ],
-                mode: 'all'
+                queryRules: [
+                    'page' => 'required|integer',
+                    'size' => 'required|integer',
+                ]
             )
         ]);
 
@@ -178,7 +177,7 @@ class ValidationModeTest extends TestCase
     }
 
     /**
-     * 测试 All 模式 - Query 参数失败
+     * 测试 queryRules - Query 参数验证失败
      */
     public function testAllModeQueryFails(): void
     {
@@ -197,10 +196,11 @@ class ValidationModeTest extends TestCase
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
                 rules: [
-                    'page' => 'required|integer',
                     'filters' => 'nullable|array',
                 ],
-                mode: 'all'
+                queryRules: [
+                    'page' => 'required|integer',
+                ]
             )
         ]);
 
@@ -208,7 +208,7 @@ class ValidationModeTest extends TestCase
     }
 
     /**
-     * 测试 All 模式 - Body 参数失败
+     * 测试 rules - Body 参数验证失败
      */
     public function testAllModeBodyFails(): void
     {
@@ -227,10 +227,11 @@ class ValidationModeTest extends TestCase
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
                 rules: [
-                    'page' => 'required|integer',
                     'filters' => 'required|array',
                 ],
-                mode: 'all'
+                queryRules: [
+                    'page' => 'required|integer',
+                ]
             )
         ]);
 
@@ -238,8 +239,8 @@ class ValidationModeTest extends TestCase
     }
 
     /**
-     * 测试 All 模式 - 参数覆盖
-     * body 的参数会覆盖 query 的同名参数
+     * 测试同名字段分别验证
+     * queryRules 和 rules 分别验证各自数据源的同名字段
      */
     public function testAllModeParameterOverride(): void
     {
@@ -256,10 +257,12 @@ class ValidationModeTest extends TestCase
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
                 rules: [
-                    'name' => 'required|string|min:8',  // BodyName 会覆盖 QueryName
+                    'name' => 'required|string|min:8',  // 验证 Body 中的 name (BodyName)
                     'email' => 'required|email',
                 ],
-                mode: 'all'
+                queryRules: [
+                    'name' => 'required|string',  // 验证 Query 中的 name (QueryName)
+                ]
             )
         ]);
 
@@ -294,7 +297,7 @@ class ValidationModeTest extends TestCase
     }
 
     /**
-     * 测试 GET 请求使用 Query 模式
+     * 测试 GET 请求使用 queryRules 验证
      */
     public function testGetRequestWithQueryMode(): void
     {
@@ -311,11 +314,10 @@ class ValidationModeTest extends TestCase
 
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
-                rules: [
+                queryRules: [
                     'id' => 'required|integer',
                     'format' => 'required|in:json,xml',
-                ],
-                mode: 'query'
+                ]
             )
         ]);
 
@@ -355,8 +357,8 @@ class ValidationModeTest extends TestCase
 
     /**
      * 测试复杂场景：搜索接口
-     * query: page, size
-     * body: filters, sort
+     * queryRules: page, size (分页参数)
+     * rules: filters, sort (搜索条件)
      */
     public function testComplexSearchScenario(): void
     {
@@ -380,8 +382,6 @@ class ValidationModeTest extends TestCase
         $joinPoint = $this->createMockJoinPoint([
             new RequestValidation(
                 rules: [
-                    'page' => 'required|integer|min:1',
-                    'size' => 'required|integer|between:1,100',
                     'filters' => 'nullable|array',
                     'filters.*.field' => 'required|string',
                     'filters.*.value' => 'required',
@@ -389,7 +389,10 @@ class ValidationModeTest extends TestCase
                     'sort.field' => 'required_with:sort|string',
                     'sort.order' => 'required_with:sort|in:asc,desc',
                 ],
-                mode: 'all'
+                queryRules: [
+                    'page' => 'required|integer|min:1',
+                    'size' => 'required|integer|between:1,100',
+                ]
             )
         ]);
 

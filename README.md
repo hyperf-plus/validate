@@ -80,30 +80,28 @@ class UserController
 
 ### 验证模式
 
-#### 1. JSON 模式（默认）
+#### 1. 验证请求体（rules）
 
-验证请求体（POST/PUT JSON 数据）：
+验证 POST/PUT 请求体数据：
 
 ```php
 #[RequestValidation(
-    rules: ['name' => 'required'],
-    mode: 'json'  // 默认值，可省略
+    rules: ['name' => 'required', 'email' => 'required|email']
 )]
 ```
 
-#### 2. Query 模式
+#### 2. 验证查询参数（queryRules）
 
-验证查询参数（GET 请求参数）：
+验证 URL 查询参数（GET 请求参数）：
 
 ```php
 #[GetApi(path: '')]
 #[RequestValidation(
-    rules: [
+    queryRules: [
         'page' => 'required|integer|min:1',
         'size' => 'required|integer|between:1,100',
         'keyword' => 'nullable|string|max:50',
-    ],
-    mode: 'query'
+    ]
 )]
 public function list()
 {
@@ -111,23 +109,37 @@ public function list()
 }
 ```
 
-#### 3. All 模式
+#### 3. 同时验证 Query 和 Body
 
-合并验证查询参数和请求体：
+使用 `queryRules` 和 `rules` 分别验证：
 
 ```php
 #[PostApi(path: '/search')]
 #[RequestValidation(
-    rules: [
-        'page' => 'required|integer',  // 来自 query
-        'filters' => 'required|array', // 来自 body
+    queryRules: [
+        'page' => 'required|integer|min:1',   // 验证 URL 查询参数
+        'size' => 'required|integer|between:1,100',
     ],
-    mode: 'all'
+    rules: [
+        'filters' => 'nullable|array',        // 验证请求体
+        'sort' => 'nullable|array',
+    ]
 )]
 public function search()
 {
     // ...
 }
+```
+
+#### 4. 请求体数据格式（mode）
+
+`mode` 参数控制请求体数据的解析方式：
+
+```php
+#[RequestValidation(
+    rules: ['name' => 'required'],
+    mode: 'json'  // 默认值，可选：json | form | xml
+)]
 ```
 
 ### 自定义错误消息
@@ -322,10 +334,10 @@ use HPlus\Validate\Aspect\ValidationAspect;
 
 $stats = ValidationAspect::getCacheStats();
 // [
-//     'hits' => 1000,
-//     'misses' => 10,
-//     'total' => 1010,
-//     'hit_rate' => '99.01%',
+//     'rule_hits' => 1000,
+//     'rule_misses' => 10,
+//     'total_requests' => 1010,
+//     'rule_hit_rate' => '99.01%',
 //     'rule_cache_size' => 10,
 // ]
 ```
@@ -415,13 +427,14 @@ $schema = RuleParser::rulesToJsonSchema([
 
 ```php
 #[RequestValidation(
-    rules: ['email' => 'required|email'],
-    messages: [],                    // ✅ 自定义消息
-    attributes: [],                  // ✅ 字段别名
-    mode: 'json',                    // ✅ 验证模式
-    filter: false,                   // ✅ 过滤多余字段
-    security: false,                 // ✅ 安全模式
-    stopOnFirstFailure: false        // ✅ 停止策略
+    rules: ['email' => 'required|email'],  // ✅ 请求体验证规则
+    queryRules: ['page' => 'integer'],     // ✅ 查询参数验证规则
+    messages: [],                          // ✅ 自定义消息
+    attributes: [],                        // ✅ 字段别名
+    mode: 'json',                          // ✅ 请求体解析模式
+    filter: false,                         // ✅ 过滤多余字段
+    security: false,                       // ✅ 安全模式
+    stopOnFirstFailure: false              // ✅ 停止策略
 )]
 ```
 
@@ -429,10 +442,11 @@ $schema = RuleParser::rulesToJsonSchema([
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `rules` | array | `[]` | 验证规则 (Laravel validation 规则) |
+| `rules` | array | `[]` | 请求体验证规则 (Laravel validation 规则) |
+| `queryRules` | array | `[]` | 查询参数验证规则 |
 | `messages` | array | `[]` | 自定义错误消息 |
 | `attributes` | array | `[]` | 字段别名（用于错误消息） |
-| `mode` | string | `'json'` | 验证模式：`json`(请求体) / `query`(查询参数) / `all`(合并) |
+| `mode` | string | `'json'` | 请求体数据解析模式：`json` / `form` / `xml` |
 | `filter` | bool | `false` | 是否过滤多余字段（只保留规则中定义的字段） |
 | `security` | bool | `false` | 安全模式（请求中有未定义字段时抛出异常） |
 | `stopOnFirstFailure` | bool | `false` | 是否在第一个失败时停止验证 |
@@ -459,11 +473,11 @@ $schema = RuleParser::rulesToJsonSchema([
 
 ### 3. 如何验证 GET 请求参数？
 
-使用 `mode: 'query'`。
+使用 `queryRules` 参数。
 
 ### 4. 如何同时验证 query 和 body？
 
-使用 `mode: 'all'`。
+同时使用 `queryRules`（验证查询参数）和 `rules`（验证请求体）。
 
 ## License
 
