@@ -407,14 +407,17 @@ class RuleParser
             foreach ($chunk as $field => $rule) {
                 [$fieldName, $description] = self::parseFieldName($field);
                 
-                $fieldSchema = self::ruleToJsonSchema($rule);
+                // 支持数组格式规则：['required', 'string', 'max:50'] -> 'required|string|max:50'
+                $ruleStr = self::normalizeRule($rule);
+                
+                $fieldSchema = self::ruleToJsonSchema($ruleStr);
                 if ($description) {
                     $fieldSchema['description'] = $description;
                 }
                 
                 $properties[$fieldName] = $fieldSchema;
                 
-                if (self::isRequired($rule)) {
+                if (self::isRequired($ruleStr)) {
                     $required[] = $fieldName;
                 }
             }
@@ -433,11 +436,23 @@ class RuleParser
     }
 
     /**
-     * 检查规则是否为必需（性能优化版本）
+     * 规范化规则格式（支持数组和字符串）
+     * 
+     * @param array|string $rule 规则（数组或字符串格式）
+     * @return string 字符串格式规则
      */
-    public static function isRequired(string $rule): bool
+    public static function normalizeRule(array|string $rule): string
     {
-        return str_contains($rule, 'required');
+        return is_array($rule) ? implode('|', $rule) : $rule;
+    }
+
+    /**
+     * 检查规则是否为必需（支持数组和字符串格式）
+     */
+    public static function isRequired(array|string $rule): bool
+    {
+        $ruleStr = self::normalizeRule($rule);
+        return str_contains($ruleStr, 'required');
     }
 
     /**
