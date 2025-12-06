@@ -31,7 +31,13 @@ class ValidationAspect extends AbstractAspect
      */
     private static array $builtinMessages = [
         'required' => ':attribute 为必填项。',
-        'email' => ':attribute 必须是有效的邮箱地址。',
+        'required_if' => '当 :other 为 :value 时，:attribute 不能为空。',
+        'required_unless' => '当 :other 不为 :value 时，:attribute 不能为空。',
+        'required_with' => '当 :values 存在时，:attribute 不能为空。',
+        'required_with_all' => '当 :values 都存在时，:attribute 不能为空。',
+        'required_without' => '当 :values 不存在时，:attribute 不能为空。',
+        'required_without_all' => '当 :values 都不存在时，:attribute 不能为空。',
+        'email' => ':attribute 必须是有效的电子邮件地址。',
         'phone' => ':attribute 必须是有效的手机号。',
         'mobile' => ':attribute 必须是有效的手机号。',
         'integer' => ':attribute 必须是整数。',
@@ -276,6 +282,18 @@ class ValidationAspect extends AbstractAspect
         }
 
         return [$normalizedRules, $attributes];
+    }
+
+    /**
+     * 获取缓存统计（测试使用）
+     */
+    public static function getCacheStats(): array
+    {
+        return [
+            'rule_cache_size' => count(self::$configCache),
+            'form_request_cache_size' => count(self::$formRequestCache),
+            'fields_cache_size' => count(self::$fieldsCache),
+        ];
     }
 
     private function getBodyData(ServerRequestInterface $request, string $mode): array
