@@ -26,6 +26,61 @@ class ValidationAspect extends AbstractAspect
     private static array $configCache = [];
     private static array $formRequestCache = [];
     private static array $fieldsCache = [];
+    /**
+     * 内置中文错误消息（当未提供 messages 且本地无翻译文件时兜底）
+     */
+    private static array $builtinMessages = [
+        'required' => ':attribute 为必填项。',
+        'email' => '必须是有效的邮箱地址。',
+        'phone' => '必须是有效的手机号。',
+        'mobile' => '必须是有效的手机号。',
+        'integer' => ':attribute 必须是整数。',
+        'numeric' => ':attribute 必须是数字。',
+        'string' => ':attribute 必须是字符串。',
+        'array' => ':attribute 必须是数组。',
+        'boolean' => ':attribute 必须是布尔值。',
+        'url' => ':attribute 必须是有效的 URL。',
+        'date' => ':attribute 必须是有效的日期。',
+        'ip' => ':attribute 必须是有效的 IP 地址。',
+        'ipv4' => ':attribute 必须是有效的 IPv4 地址。',
+        'ipv6' => ':attribute 必须是有效的 IPv6 地址。',
+        'json' => ':attribute 必须是合法的 JSON 字符串。',
+        'alpha' => ':attribute 只能包含字母。',
+        'alpha_num' => ':attribute 只能包含字母和数字。',
+        'alpha_dash' => ':attribute 只能包含字母、数字、破折号和下划线。',
+        'min' => [
+            'numeric' => ':attribute 不能小于 :min。',
+            'string' => ':attribute 长度不能少于 :min 个字符。',
+            'array' => ':attribute 元素个数不能少于 :min 个。',
+        ],
+        'max' => [
+            'numeric' => ':attribute 不能大于 :max。',
+            'string' => ':attribute 长度不能超过 :max 个字符。',
+            'array' => ':attribute 元素个数不能超过 :max 个。',
+        ],
+        'between' => [
+            'numeric' => ':attribute 必须在 :min 和 :max 之间。',
+            'string' => ':attribute 长度必须在 :min 和 :max 之间。',
+            'array' => ':attribute 元素个数必须在 :min 和 :max 之间。',
+        ],
+        'size' => [
+            'numeric' => ':attribute 必须等于 :size。',
+            'string' => ':attribute 长度必须为 :size 个字符。',
+            'array' => ':attribute 元素个数必须为 :size 个。',
+        ],
+        'in' => ':attribute 的值不在允许范围内。',
+        'not_in' => ':attribute 的值不在允许范围内。',
+        'regex' => ':attribute 格式不正确。',
+        'same' => ':attribute 与 :other 必须相同。',
+        'different' => ':attribute 与 :other 必须不同。',
+        'confirmed' => ':attribute 与确认字段不匹配。',
+        'after' => ':attribute 必须在 :date 之后。',
+        'before' => ':attribute 必须在 :date 之前。',
+        'after_or_equal' => ':attribute 必须在 :date 当天或之后。',
+        'before_or_equal' => ':attribute 必须在 :date 当天或之前。',
+        'unique' => ':attribute 已被占用。',
+        'exists' => ':attribute 不存在或无效。',
+    ];
 
     public function __construct(
         private readonly ContainerInterface $container,
@@ -137,7 +192,10 @@ class ValidationAspect extends AbstractAspect
 
     private function validateData(array $data, array $rules, array $config, string $type): ?array
     {
-        $allowedFields = $this->getFieldsFromRules($rules);
+        // 规范化规则：支持 "field|标题" 写法，将标题写入 attributes，并去掉规则 key 中的标题部分
+        [$normalizedRules, $normalizedAttributes] = $this->normalizeRules($rules, $config['attributes']);
+
+        $allowedFields = $this->getFieldsFromRules($normalizedRules);
 
         if ($config['security']) {
             $allowedSet = array_flip($allowedFields);
@@ -148,7 +206,12 @@ class ValidationAspect extends AbstractAspect
             }
         }
 
-        $validator = $this->validatorFactory->make($data, $rules, $config['messages'], $config['attributes']);
+        // 合并内置中文消息（最低优先级），用户自定义 messages 覆盖内置
+        $messages = $config['messages'] === []
+            ? self::$builtinMessages
+            : array_replace_recursive(self::$builtinMessages, $config['messages']);
+
+        $validator = $this->validatorFactory->make($data, $normalizedRules, $messages, $normalizedAttributes);
 
         if ($config['stopOnFirstFailure'] && method_exists($validator, 'stopOnFirstFailure')) {
             $validator->stopOnFirstFailure();
@@ -183,6 +246,36 @@ class ValidationAspect extends AbstractAspect
         }
 
         return self::$fieldsCache[$cacheKey] = array_keys($fields);
+    }
+
+    /**
+     * 规范化规则：支持 "field|标题" 写法
+     * - 去掉规则 key 中的标题部分
+     * - 将标题写入 attributes（用户自定义 attributes 优先）
+     *
+     * @param array $rules 原始规则
+     * @param array $attributes 已有的 attributes
+     *
+     * @return array{0: array, 1: array} [规范化后的规则, 合并后的 attributes]
+     */
+    private function normalizeRules(array $rules, array $attributes): array
+    {
+        $normalizedRules = [];
+        foreach ($rules as $field => $rule) {
+            $label = null;
+            if (str_contains($field, '|')) {
+                [$field, $label] = explode('|', $field, 2);
+            }
+
+            $normalizedRules[$field] = $rule;
+
+            // 用户未提供 attributes 时，从 label 中填充
+            if ($label !== null && !isset($attributes[$field])) {
+                $attributes[$field] = $label;
+            }
+        }
+
+        return [$normalizedRules, $attributes];
     }
 
     private function getBodyData(ServerRequestInterface $request, string $mode): array
@@ -247,19 +340,5 @@ class ValidationAspect extends AbstractAspect
         self::$configCache = [];
         self::$formRequestCache = [];
         self::$fieldsCache = [];
-    }
-
-    /**
-     * 获取缓存统计（测试用）
-     */
-    public static function getCacheStats(): array
-    {
-        return [
-            'rule_hits' => 0,
-            'rule_misses' => 0,
-            'total_requests' => 0,
-            'rule_hit_rate' => '0%',
-            'rule_cache_size' => count(self::$configCache),
-        ];
     }
 }
