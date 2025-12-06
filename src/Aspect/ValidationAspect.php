@@ -31,9 +31,9 @@ class ValidationAspect extends AbstractAspect
      */
     private static array $builtinMessages = [
         'required' => ':attribute 为必填项。',
-        'email' => '必须是有效的邮箱地址。',
-        'phone' => '必须是有效的手机号。',
-        'mobile' => '必须是有效的手机号。',
+        'email' => ':attribute 必须是有效的邮箱地址。',
+        'phone' => ':attribute 必须是有效的手机号。',
+        'mobile' => ':attribute 必须是有效的手机号。',
         'integer' => ':attribute 必须是整数。',
         'numeric' => ':attribute 必须是数字。',
         'string' => ':attribute 必须是字符串。',
