@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.0/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         failOnRisky="true"
+         failOnWarning="true"
+         stopOnFailure="false">
+    
+    <!-- 测试套件配置 -->
+    <testsuites>
+        <testsuite name="Unit Tests">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature Tests">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Performance Tests">
+            <directory>tests/Performance</directory>
+        </testsuite>
+    </testsuites>
+
+    <!-- 代码覆盖率配置 -->
+    <source>
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+        <exclude>
+            <directory>src/Annotations</directory>
+            <file>src/ConfigProvider.php</file>
+        </exclude>
+    </source>
+
+    <!-- PHP 配置 -->
+    <php>
+        <ini name="display_errors" value="1"/>
+        <ini name="error_reporting" value="-1"/>
+        <ini name="memory_limit" value="512M"/>
+        <env name="APP_ENV" value="testing"/>
+    </php>
+
+    <!-- 日志配置 -->
+    <logging>
+        <junit outputFile="build/logs/junit.xml"/>
+        <testdoxHtml outputFile="build/logs/testdox.html"/>
+    </logging>
+</phpunit>
