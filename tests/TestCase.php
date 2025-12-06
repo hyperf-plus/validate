@@ -28,6 +28,12 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        
+        // 每个测试前清理缓存，避免测试之间相互影响
+        if (class_exists(\HPlus\Validate\Aspect\ValidationAspect::class)) {
+            \HPlus\Validate\Aspect\ValidationAspect::clearCache();
+        }
+        
         $this->container = $this->createContainer();
         ApplicationContext::setContainer($this->container);
     }
@@ -191,4 +197,5 @@ abstract class TestCase extends BaseTestCase
         
         $callback();
     }
+
 }

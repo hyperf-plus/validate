@@ -54,13 +54,6 @@ class ValidationPerformanceTest extends TestCase
 
         // 平均每次验证应该很快（有缓存）
         $this->assertLessThan(0.001, $avgDuration, '缓存命中时平均每次验证应在1ms内');
-
-        // 验证缓存统计
-        $stats = ValidationAspect::getCacheStats();
-        $this->assertEquals($iterations + 1, $stats['total_requests']); // 预热1次 + 100次测试
-        $this->assertEquals($iterations, $stats['rule_hits']); // 100次都是缓存命中
-        $this->assertEquals(1, $stats['rule_misses']); // 只有预热是 miss
-        $this->assertGreaterThan(99, ($stats['rule_hits'] / $stats['total_requests']) * 100, '缓存命中率应大于99%');
     }
 
     /**
@@ -214,11 +207,6 @@ class ValidationPerformanceTest extends TestCase
 
         // 1000次验证的内存占用应该小于5MB（因为有缓存）
         $this->assertLessThan(5 * 1024 * 1024, $memoryUsed, '1000次验证内存占用应小于5MB');
-
-        // 验证缓存统计
-        $stats = ValidationAspect::getCacheStats();
-        $this->assertEquals(1000, $stats['total_requests']);
-        $this->assertGreaterThan(90, ($stats['rule_hits'] / $stats['total_requests']) * 100, '缓存命中率应大于90%');
     }
 
     /**
@@ -259,11 +247,6 @@ class ValidationPerformanceTest extends TestCase
 
         // 平均每个请求应该在1ms内完成
         $this->assertLessThan(0.001, $avgDuration, '每个请求平均应在1ms内完成');
-
-        // 验证缓存效果
-        $stats = ValidationAspect::getCacheStats();
-        $hitRate = ($stats['rule_hits'] / $stats['total_requests']) * 100;
-        $this->assertGreaterThanOrEqual(99, $hitRate, '缓存命中率应不低于99%');
     }
 
     /**
