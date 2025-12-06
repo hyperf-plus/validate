@@ -3,16 +3,19 @@
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D8.1-8892BF.svg)](https://php.net)
 [![Hyperf Version](https://img.shields.io/badge/hyperf-%3E%3D3.1-brightgreen.svg)](https://hyperf.io)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue)](https://github.com/hyperf-plus/validate/actions)
 
 基于 `hyperf/validation` 的请求验证组件，支持注解式验证和 FormRequest 验证器。
+内置中文错误提示兜底、本地无语言包也能返回中文；默认安全过滤多余字段，可选安全模式拒绝未定义字段。
 
 ## ✨ 4.0 新特性
 
-- 🚀 **Hyperf 原生验证** - 完全基于 hyperf/validation，兼容所有 Laravel 验证规则
-- 📝 **双模式支持** - 内联规则 + FormRequest 验证器
-- ⚡ **极致性能** - 多层缓存，配置/类检查/字段列表全缓存
-- 🎯 **精简设计** - 移除冗余功能，代码量减少 40%
-- 🔧 **Query/Body 分离** - 清晰区分 URL 参数和请求体验证
+- 🚀 **Hyperf 原生验证**：完全基于 hyperf/validation，兼容所有 Laravel 规则
+- 📝 **双模式**：内联规则 + FormRequest 验证器，支持场景
+- ⚡ **性能优化**：多层缓存（配置/类检查/字段列表），更快
+- 🛡️ **安全稳定**：可选安全模式拦截未定义字段，内置中文错误兜底，无语言包仍返回中文
+- 🔧 **Query/Body 分离**：清晰区分 URL 参数与请求体校验
+- ✅ **CI 覆盖**：GitHub Actions 多 PHP 版本自动化测试
 
 > ⚠️ **破坏性变更**: 4.0 版本移除了 ThinkPHP 风格的 `Validate` 基类，仅支持 Hyperf 原生 `FormRequest`。
 
